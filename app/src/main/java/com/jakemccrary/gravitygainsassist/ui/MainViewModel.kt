@@ -14,6 +14,7 @@ import com.jakemccrary.gravitygainsassist.model.SyncSkipReason
 import com.jakemccrary.gravitygainsassist.model.WeightReading
 import com.jakemccrary.gravitygainsassist.sync.SyncScheduler
 import com.jakemccrary.gravitygainsassist.website.AuthRepository
+import com.jakemccrary.gravitygainsassist.website.GripGainsSession
 import com.jakemccrary.gravitygainsassist.website.GripGainsSessionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -31,20 +32,17 @@ class MainViewModel(
 ) : ViewModel() {
     private val healthStatus = MutableStateFlow<HealthConnectStatus?>(null)
     private val statusMessage = MutableStateFlow<String?>(null)
-    private val tokenDraft = MutableStateFlow("")
 
     val screenState: StateFlow<MainScreenState> = combine(
         appStateRepository.appState,
         authRepository.sessionState,
         healthStatus,
         statusMessage,
-        tokenDraft,
-    ) { appState, sessionState, currentHealthStatus, currentMessage, currentTokenDraft ->
+    ) { appState, sessionState, currentHealthStatus, currentMessage ->
         appState.toScreenState(
             sessionState = sessionState,
             healthStatus = currentHealthStatus,
             statusMessage = currentMessage,
-            tokenDraft = currentTokenDraft,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -117,29 +115,17 @@ class MainViewModel(
         statusMessage.value = "Sync work enqueued."
     }
 
-    fun onTokenChanged(value: String) {
-        tokenDraft.value = value
-    }
-
-    fun saveToken() {
+    fun completeGripGainsSignIn(session: GripGainsSession) {
         viewModelScope.launch {
-            val normalizedToken = tokenDraft.value.trim()
-            if (normalizedToken.isBlank()) {
-                statusMessage.value = "Enter a Grip Gains token first."
-                return@launch
-            }
-
-            authRepository.saveToken(normalizedToken)
-            tokenDraft.value = ""
-            statusMessage.value = "Grip Gains token saved."
+            authRepository.saveSession(session)
+            statusMessage.value = "Grip Gains sign-in saved."
         }
     }
 
-    fun clearToken() {
+    fun clearGripGainsSession() {
         viewModelScope.launch {
             authRepository.clearSession()
-            tokenDraft.value = ""
-            statusMessage.value = "Grip Gains token cleared."
+            statusMessage.value = "Grip Gains sign-in cleared."
         }
     }
 
@@ -166,7 +152,6 @@ class MainViewModel(
 data class MainScreenState(
     val healthStatus: HealthConnectStatus? = null,
     val sessionState: GripGainsSessionState = GripGainsSessionState(),
-    val tokenDraft: String = "",
     val lastWeight: WeightReading? = null,
     val lastSubmittedWeight: SubmittedWeight? = null,
     val lastSyncAttemptAt: java.time.Instant? = null,
@@ -180,12 +165,10 @@ private fun AppState.toScreenState(
     sessionState: GripGainsSessionState,
     healthStatus: HealthConnectStatus?,
     statusMessage: String?,
-    tokenDraft: String,
 ): MainScreenState {
     return MainScreenState(
         healthStatus = healthStatus,
         sessionState = sessionState,
-        tokenDraft = tokenDraft,
         lastWeight = lastWeight,
         lastSubmittedWeight = lastSubmittedWeight,
         lastSyncAttemptAt = lastSyncAttemptAt,
@@ -210,7 +193,7 @@ private fun SyncSkipReason.displayText(): String {
         SyncSkipReason.WEIGHT_PERMISSION_MISSING -> "Weight permission missing"
         SyncSkipReason.BACKGROUND_READ_UNAVAILABLE -> "Background read unavailable"
         SyncSkipReason.NO_WEIGHT_DATA -> "No weight data"
-        SyncSkipReason.MISSING_SESSION -> "No Grip Gains token saved"
+        SyncSkipReason.MISSING_SESSION -> "No Grip Gains sign-in saved"
         SyncSkipReason.INVALID_SESSION -> "Grip Gains session is invalid"
     }
 }

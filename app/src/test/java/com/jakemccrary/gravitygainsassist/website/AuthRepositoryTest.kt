@@ -16,13 +16,44 @@ class AuthRepositoryTest {
             GripGainsSessionState.Status.TOKEN_PRESENT,
             repository.getSessionState().status,
         )
-        assertEquals(GripGainsSession("abc123"), repository.getActiveSession())
+        assertEquals(
+            GripGainsSession(
+                token = "abc123",
+                cookieHeader = "grip_gains_token=abc123",
+            ),
+            repository.getActiveSession(),
+        )
+    }
+
+    @Test
+    fun `save session stores token and cookie header`() = runTest {
+        val repository = DefaultAuthRepository(FakeSessionStore())
+
+        repository.saveSession(
+            GripGainsSession(
+                token = "jwt-token",
+                cookieHeader = "csrftoken=abc; grip_gains_token=jwt-token",
+            ),
+        )
+
+        assertEquals(
+            GripGainsSession(
+                token = "jwt-token",
+                cookieHeader = "csrftoken=abc; grip_gains_token=jwt-token",
+            ),
+            repository.getActiveSession(),
+        )
     }
 
     @Test
     fun `clear session removes stored token`() = runTest {
         val repository = DefaultAuthRepository(
-            FakeSessionStore(StoredSessionRecord(token = "abc123")),
+            FakeSessionStore(
+                StoredSessionRecord(
+                    token = "abc123",
+                    cookieHeader = "grip_gains_token=abc123",
+                ),
+            ),
         )
 
         repository.clearSession()
@@ -34,7 +65,12 @@ class AuthRepositoryTest {
     @Test
     fun `mark session invalid keeps token but removes active session`() = runTest {
         val repository = DefaultAuthRepository(
-            FakeSessionStore(StoredSessionRecord(token = "abc123")),
+            FakeSessionStore(
+                StoredSessionRecord(
+                    token = "abc123",
+                    cookieHeader = "grip_gains_token=abc123",
+                ),
+            ),
         )
 
         repository.markSessionInvalid()
@@ -49,7 +85,13 @@ class AuthRepositoryTest {
     @Test
     fun `mark session valid restores usable session`() = runTest {
         val repository = DefaultAuthRepository(
-            FakeSessionStore(StoredSessionRecord(token = "abc123", isInvalid = true)),
+            FakeSessionStore(
+                StoredSessionRecord(
+                    token = "abc123",
+                    cookieHeader = "grip_gains_token=abc123",
+                    isInvalid = true,
+                ),
+            ),
         )
 
         repository.markSessionValid()
@@ -58,7 +100,13 @@ class AuthRepositoryTest {
             GripGainsSessionState.Status.TOKEN_PRESENT,
             repository.getSessionState().status,
         )
-        assertEquals(GripGainsSession("abc123"), repository.getActiveSession())
+        assertEquals(
+            GripGainsSession(
+                token = "abc123",
+                cookieHeader = "grip_gains_token=abc123",
+            ),
+            repository.getActiveSession(),
+        )
     }
 
     private class FakeSessionStore(

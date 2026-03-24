@@ -192,6 +192,34 @@ class SyncCoordinatorTest {
     }
 
     @Test
+    fun `server failure with response detail is shown in failure message`() = runTest {
+        val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
+        val appStateRepository = FakeAppStateRepository()
+        val coordinator = DefaultSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                status = availableStatus(),
+                latestWeight = latestWeight,
+            ),
+            appStateRepository = appStateRepository,
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                result = SubmissionResult.ServerFailure(
+                    statusCode = 400,
+                    responseMessage = "A bodyweight entry already exists for this date",
+                ),
+            ),
+            clock = fixedClock,
+        )
+
+        val outcome = coordinator.runSync(SyncTrigger.MANUAL)
+
+        assertTrue(outcome is SyncOutcome.Failed)
+        assertEquals(
+            "Grip Gains rejected the submission: A bodyweight entry already exists for this date",
+            appStateRepository.lastFailureMessage,
+        )
+    }
+
+    @Test
     fun `sync failures surface as failed outcomes`() = runTest {
         val coordinator = DefaultSyncCoordinator(
             healthConnectRepository = FakeHealthConnectRepository(

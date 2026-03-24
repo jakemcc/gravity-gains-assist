@@ -17,9 +17,13 @@ import com.jakemccrary.gravitygainsassist.sync.SyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.SyncScheduler
 import com.jakemccrary.gravitygainsassist.sync.WorkManagerSyncScheduler
 import com.jakemccrary.gravitygainsassist.website.AuthRepository
+import com.jakemccrary.gravitygainsassist.website.AndroidGripGainsCookieSource
+import com.jakemccrary.gravitygainsassist.website.AndroidGripGainsLoginWebViewFactory
 import com.jakemccrary.gravitygainsassist.website.DefaultAuthRepository
 import com.jakemccrary.gravitygainsassist.website.GripGainsPayloadMapper
 import com.jakemccrary.gravitygainsassist.website.GripGainsRequestFactory
+import com.jakemccrary.gravitygainsassist.website.GripGainsWebSignInSessionCapture
+import com.jakemccrary.gravitygainsassist.website.GripGainsLoginWebViewFactory
 import com.jakemccrary.gravitygainsassist.website.GripGainsWebsiteSubmissionRepository
 import com.jakemccrary.gravitygainsassist.website.HttpUrlConnectionGripGainsApi
 import com.jakemccrary.gravitygainsassist.website.SecurePreferencesSessionStore
@@ -33,6 +37,8 @@ class AppContainer private constructor(
     val appStateRepository: AppStateRepository,
     val healthConnectRepository: HealthConnectRepository,
     val authRepository: AuthRepository,
+    val gripGainsWebSignInSessionCapture: GripGainsWebSignInSessionCapture,
+    val gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory,
     val syncScheduler: SyncScheduler,
     val syncCoordinator: SyncCoordinator,
     val workerFactory: AppWorkerFactory,
@@ -62,6 +68,11 @@ class AppContainer private constructor(
             val authRepository: AuthRepository = DefaultAuthRepository(
                 sessionStore = SecurePreferencesSessionStore(applicationContext),
             )
+            val gripGainsWebSignInSessionCapture = GripGainsWebSignInSessionCapture(
+                cookieSource = AndroidGripGainsCookieSource(),
+            )
+            val gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory =
+                AndroidGripGainsLoginWebViewFactory()
             val websiteSubmissionRepository: WebsiteSubmissionRepository =
                 GripGainsWebsiteSubmissionRepository(
                     authRepository = authRepository,
@@ -84,6 +95,8 @@ class AppContainer private constructor(
                 appStateRepository = appStateRepository,
                 healthConnectRepository = healthConnectRepository,
                 authRepository = authRepository,
+                gripGainsWebSignInSessionCapture = gripGainsWebSignInSessionCapture,
+                gripGainsLoginWebViewFactory = gripGainsLoginWebViewFactory,
                 syncScheduler = syncScheduler,
                 syncCoordinator = syncCoordinator,
                 workerFactory = workerFactory,

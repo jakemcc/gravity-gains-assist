@@ -17,7 +17,13 @@ class GripGainsRequestFactoryTest {
             recordedAt = Instant.parse("2026-03-24T04:15:00Z"),
         )
 
-        val prepared = factory.create(reading, GripGainsSession("jwt-token"))
+        val prepared = factory.create(
+            reading,
+            GripGainsSession(
+                token = "jwt-token",
+                cookieHeader = "csrftoken=abc; grip_gains_token=jwt-token",
+            ),
+        )
 
         assertEquals("POST", prepared.request.method)
         assertEquals("https://gripgains.ca/api/bodyweight/", prepared.request.url)
@@ -27,6 +33,6 @@ class GripGainsRequestFactoryTest {
         assertEquals("https://gripgains.ca/gravity-gains", prepared.request.headers["Referer"])
         assertEquals("https://gripgains.ca", prepared.request.headers["Origin"])
         assertEquals("Bearer jwt-token", prepared.request.headers["Authorization"])
-        assertEquals("grip_gains_token=jwt-token", prepared.request.headers["Cookie"])
+        assertEquals("csrftoken=abc; grip_gains_token=jwt-token", prepared.request.headers["Cookie"])
     }
 }

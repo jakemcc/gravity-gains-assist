@@ -20,14 +20,21 @@ class SecurePreferencesSessionStore(
 
     override fun read(): StoredSessionRecord {
         val encryptedToken = sharedPreferences.getString(TOKEN_KEY, null)
+        val encryptedCookieHeader = sharedPreferences.getString(COOKIE_HEADER_KEY, null)
         val isInvalid = sharedPreferences.getBoolean(INVALID_KEY, false)
         if (encryptedToken.isNullOrBlank()) {
             return StoredSessionRecord()
         }
 
         return try {
+            val token = tokenCipher.decrypt(encryptedToken)
             StoredSessionRecord(
-                token = tokenCipher.decrypt(encryptedToken),
+                token = token,
+                cookieHeader = if (encryptedCookieHeader.isNullOrBlank()) {
+                    defaultGripGainsCookieHeader(token)
+                } else {
+                    tokenCipher.decrypt(encryptedCookieHeader)
+                },
                 isInvalid = isInvalid,
             )
         } catch (_: Throwable) {
@@ -42,8 +49,10 @@ class SecurePreferencesSessionStore(
             return
         }
 
+        val cookieHeader = record.cookieHeader ?: defaultGripGainsCookieHeader(record.token)
         sharedPreferences.edit()
             .putString(TOKEN_KEY, tokenCipher.encrypt(record.token))
+            .putString(COOKIE_HEADER_KEY, tokenCipher.encrypt(cookieHeader))
             .putBoolean(INVALID_KEY, record.isInvalid)
             .apply()
     }
@@ -51,6 +60,7 @@ class SecurePreferencesSessionStore(
     override fun clear() {
         sharedPreferences.edit()
             .remove(TOKEN_KEY)
+            .remove(COOKIE_HEADER_KEY)
             .remove(INVALID_KEY)
             .apply()
     }
@@ -58,6 +68,7 @@ class SecurePreferencesSessionStore(
     private companion object {
         const val PREFERENCES_NAME = "grip_gains_session"
         const val TOKEN_KEY = "token"
+        const val COOKIE_HEADER_KEY = "cookie_header"
         const val INVALID_KEY = "invalid"
     }
 }

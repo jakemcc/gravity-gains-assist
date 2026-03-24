@@ -33,7 +33,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
     fun `invalid session returns invalid session result`() = runTest {
         val authRepository = FakeAuthRepository(
             initialState = GripGainsSessionState(GripGainsSessionState.Status.INVALID_SESSION),
-            session = GripGainsSession("jwt-token"),
+            session = GripGainsSession("jwt-token", "grip_gains_token=jwt-token"),
         )
         val repository = createRepository(authRepository, FakeGripGainsApi(statusCode = 200))
 
@@ -46,7 +46,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
     fun `successful submission returns submitted weight and marks session valid`() = runTest {
         val authRepository = FakeAuthRepository(
             initialState = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT),
-            session = GripGainsSession("jwt-token"),
+            session = GripGainsSession("jwt-token", "grip_gains_token=jwt-token"),
         )
         val api = FakeGripGainsApi(statusCode = 201)
         val repository = createRepository(authRepository, api)
@@ -70,7 +70,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
     fun `401 marks session invalid and returns auth expired`() = runTest {
         val authRepository = FakeAuthRepository(
             initialState = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT),
-            session = GripGainsSession("jwt-token"),
+            session = GripGainsSession("jwt-token", "grip_gains_token=jwt-token"),
         )
         val repository = createRepository(authRepository, FakeGripGainsApi(statusCode = 401))
 
@@ -84,7 +84,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
     fun `network exception becomes network failure`() = runTest {
         val authRepository = FakeAuthRepository(
             initialState = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT),
-            session = GripGainsSession("jwt-token"),
+            session = GripGainsSession("jwt-token", "grip_gains_token=jwt-token"),
         )
         val repository = createRepository(
             authRepository,
@@ -100,13 +100,25 @@ class GripGainsWebsiteSubmissionRepositoryTest {
     fun `unexpected status becomes server failure`() = runTest {
         val authRepository = FakeAuthRepository(
             initialState = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT),
-            session = GripGainsSession("jwt-token"),
+            session = GripGainsSession("jwt-token", "grip_gains_token=jwt-token"),
         )
-        val repository = createRepository(authRepository, FakeGripGainsApi(statusCode = 500))
+        val repository = createRepository(
+            authRepository,
+            FakeGripGainsApi(
+                statusCode = 400,
+                responseBody = """{"detail":"A bodyweight entry already exists for this date"}""",
+            ),
+        )
 
         val result = repository.submitWeight(reading)
 
-        assertEquals(SubmissionResult.ServerFailure(500), result)
+        assertEquals(
+            SubmissionResult.ServerFailure(
+                statusCode = 400,
+                responseMessage = "A bodyweight entry already exists for this date",
+            ),
+            result,
+        )
     }
 
     private fun createRepository(
@@ -146,6 +158,10 @@ class GripGainsWebsiteSubmissionRepositoryTest {
             mutableState.value = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT)
         }
 
+        override suspend fun saveSession(session: GripGainsSession) {
+            mutableState.value = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT)
+        }
+
         override suspend fun clearSession() {
             mutableState.value = GripGainsSessionState(GripGainsSessionState.Status.NO_TOKEN)
         }
@@ -163,6 +179,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
 
     private class FakeGripGainsApi(
         private val statusCode: Int = 200,
+        private val responseBody: String? = null,
         private val throwable: Throwable? = null,
     ) : GripGainsApi {
         var lastRequest: GripGainsRequest? = null
@@ -170,7 +187,7 @@ class GripGainsWebsiteSubmissionRepositoryTest {
         override suspend fun execute(request: GripGainsRequest): GripGainsApiResponse {
             lastRequest = request
             throwable?.let { throw it }
-            return GripGainsApiResponse(statusCode)
+            return GripGainsApiResponse(statusCode, responseBody)
         }
     }
 }

@@ -3,27 +3,44 @@ package com.jakemccrary.gravitygainsassist.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
 import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
 import com.jakemccrary.gravitygainsassist.model.SubmittedWeight
 import com.jakemccrary.gravitygainsassist.model.WeightReading
+import com.jakemccrary.gravitygainsassist.website.GripGainsLoginWebViewFactory
+import com.jakemccrary.gravitygainsassist.website.GripGainsSession
 import com.jakemccrary.gravitygainsassist.website.GripGainsSessionState
+import com.jakemccrary.gravitygainsassist.website.GripGainsWebSignInSessionCapture
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -33,21 +50,35 @@ import java.util.Locale
 @Composable
 fun MainScreen(
     viewModel: MainViewModel,
+    gripGainsWebSignInSessionCapture: GripGainsWebSignInSessionCapture,
+    gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory,
     onGrantPermissions: () -> Unit,
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
+    var isShowingGripGainsSignIn by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         MainScreenContent(
             screenState = screenState,
             onGrantPermissions = onGrantPermissions,
-            onTokenChanged = viewModel::onTokenChanged,
-            onSaveToken = viewModel::saveToken,
-            onClearToken = viewModel::clearToken,
+            onStartGripGainsSignIn = { isShowingGripGainsSignIn = true },
+            onClearGripGainsSession = viewModel::clearGripGainsSession,
             onReadLatestWeight = viewModel::readLatestWeightNow,
             onScheduleDailySync = viewModel::scheduleDailySync,
             onRunSyncNow = viewModel::runSyncNow,
             innerPadding = innerPadding,
+        )
+    }
+
+    if (isShowingGripGainsSignIn) {
+        GripGainsSignInDialog(
+            gripGainsWebSignInSessionCapture = gripGainsWebSignInSessionCapture,
+            gripGainsLoginWebViewFactory = gripGainsLoginWebViewFactory,
+            onDismiss = { isShowingGripGainsSignIn = false },
+            onSessionCaptured = { session ->
+                isShowingGripGainsSignIn = false
+                viewModel.completeGripGainsSignIn(session)
+            },
         )
     }
 }
@@ -56,9 +87,8 @@ fun MainScreen(
 private fun MainScreenContent(
     screenState: MainScreenState,
     onGrantPermissions: () -> Unit,
-    onTokenChanged: (String) -> Unit,
-    onSaveToken: () -> Unit,
-    onClearToken: () -> Unit,
+    onStartGripGainsSignIn: () -> Unit,
+    onClearGripGainsSession: () -> Unit,
     onReadLatestWeight: () -> Unit,
     onScheduleDailySync: () -> Unit,
     onRunSyncNow: () -> Unit,
@@ -92,18 +122,11 @@ private fun MainScreenContent(
 
         HorizontalDivider(modifier = Modifier.fillMaxWidth())
 
-        OutlinedTextField(
-            value = screenState.tokenDraft,
-            onValueChange = onTokenChanged,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Grip Gains token") },
-            singleLine = true,
-        )
-        Button(onClick = onSaveToken) {
-            Text("Save token")
+        Button(onClick = onStartGripGainsSignIn) {
+            Text("Sign in to Grip Gains")
         }
-        Button(onClick = onClearToken) {
-            Text("Clear token")
+        Button(onClick = onClearGripGainsSession) {
+            Text("Clear Grip Gains sign-in")
         }
         Button(
             onClick = onGrantPermissions,
@@ -210,8 +233,76 @@ private fun formatPounds(value: Double): String {
 
 private fun GripGainsSessionState.Status.displayText(): String {
     return when (this) {
-        GripGainsSessionState.Status.NO_TOKEN -> "No token"
-        GripGainsSessionState.Status.TOKEN_PRESENT -> "Token present"
+        GripGainsSessionState.Status.NO_TOKEN -> "Not signed in"
+        GripGainsSessionState.Status.TOKEN_PRESENT -> "Signed in"
         GripGainsSessionState.Status.INVALID_SESSION -> "Invalid session"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GripGainsSignInDialog(
+    gripGainsWebSignInSessionCapture: GripGainsWebSignInSessionCapture,
+    gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory,
+    onDismiss: () -> Unit,
+    onSessionCaptured: (GripGainsSession) -> Unit,
+) {
+    val context = LocalContext.current
+    val latestSessionCapture = rememberUpdatedState(gripGainsWebSignInSessionCapture)
+    val latestOnSessionCaptured = rememberUpdatedState(onSessionCaptured)
+    val webView = remember {
+        gripGainsLoginWebViewFactory.create(context) {
+            latestSessionCapture.value.capture()?.let { latestOnSessionCaptured.value(it) }
+        }
+    }
+
+    DisposableEffect(webView) {
+        onDispose {
+            webView.stopLoading()
+            webView.destroy()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "Grip Gains sign-in",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                    Button(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                }
+                Text(
+                    text = "Sign in once. The app will save your session automatically.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                AndroidView(
+                    factory = { webView },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 480.dp),
+                )
+            }
+        }
     }
 }

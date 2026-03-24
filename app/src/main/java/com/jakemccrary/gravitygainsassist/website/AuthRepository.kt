@@ -11,6 +11,8 @@ interface AuthRepository {
 
     fun getActiveSession(): GripGainsSession?
 
+    suspend fun saveSession(session: GripGainsSession)
+
     suspend fun saveToken(token: String)
 
     suspend fun clearSession()
@@ -34,8 +36,29 @@ class DefaultAuthRepository(
         return if (record.token.isNullOrBlank() || record.isInvalid) {
             null
         } else {
-            GripGainsSession(record.token)
+            GripGainsSession(
+                token = record.token,
+                cookieHeader = record.cookieHeader ?: defaultGripGainsCookieHeader(record.token),
+            )
         }
+    }
+
+    override suspend fun saveSession(session: GripGainsSession) {
+        val normalizedToken = session.token.trim()
+        val normalizedCookieHeader = session.cookieHeader.trim()
+        if (normalizedToken.isBlank() || normalizedCookieHeader.isBlank()) {
+            clearSession()
+            return
+        }
+
+        sessionStore.write(
+            StoredSessionRecord(
+                token = normalizedToken,
+                cookieHeader = normalizedCookieHeader,
+                isInvalid = false,
+            ),
+        )
+        mutableSessionState.value = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT)
     }
 
     override suspend fun saveToken(token: String) {
@@ -45,13 +68,12 @@ class DefaultAuthRepository(
             return
         }
 
-        sessionStore.write(
-            StoredSessionRecord(
+        saveSession(
+            GripGainsSession(
                 token = normalizedToken,
-                isInvalid = false,
+                cookieHeader = defaultGripGainsCookieHeader(normalizedToken),
             ),
         )
-        mutableSessionState.value = GripGainsSessionState(GripGainsSessionState.Status.TOKEN_PRESENT)
     }
 
     override suspend fun clearSession() {

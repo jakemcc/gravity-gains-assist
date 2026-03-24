@@ -2,12 +2,14 @@ package com.jakemccrary.gravitygainsassist.website
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
 data class GripGainsApiResponse(
     val statusCode: Int,
+    val responseBody: String? = null,
 )
 
 interface GripGainsApi {
@@ -31,7 +33,11 @@ class HttpUrlConnectionGripGainsApi(
                     writer.write(request.body)
                 }
 
-                GripGainsApiResponse(statusCode = connection.responseCode)
+                val statusCode = connection.responseCode
+                GripGainsApiResponse(
+                    statusCode = statusCode,
+                    responseBody = connection.readResponseBody(statusCode),
+                )
             } finally {
                 connection.disconnect()
             }
@@ -46,5 +52,21 @@ interface GripGainsConnectionFactory {
 class UrlGripGainsConnectionFactory : GripGainsConnectionFactory {
     override fun open(url: String): HttpURLConnection {
         return URL(url).openConnection() as HttpURLConnection
+    }
+}
+
+private fun HttpURLConnection.readResponseBody(statusCode: Int): String? {
+    val stream = if (statusCode >= 400) {
+        errorStream
+    } else {
+        inputStream
+    } ?: return null
+
+    return try {
+        stream.bufferedReader(Charsets.UTF_8).use(BufferedReader::readText)
+            .trim()
+            .ifBlank { null }
+    } catch (_: IOException) {
+        null
     }
 }

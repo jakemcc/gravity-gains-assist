@@ -27,7 +27,7 @@ class GripGainsRequestFactory(
             request = GripGainsRequest(
                 method = "POST",
                 url = BODYWEIGHT_URL,
-                headers = authHeadersFormatter.format(session.token),
+                headers = authHeadersFormatter.format(session),
                 body = buildJsonBody(submittedWeight),
             ),
         )
@@ -48,14 +48,14 @@ class GripGainsRequestFactory(
 }
 
 class GripGainsAuthHeadersFormatter {
-    fun format(token: String): Map<String, String> {
+    fun format(session: GripGainsSession): Map<String, String> {
         return linkedMapOf(
             "Content-Type" to "application/json",
             "Accept" to "application/json",
             "Referer" to "https://gripgains.ca/gravity-gains",
             "Origin" to "https://gripgains.ca",
-            "Authorization" to "Bearer $token",
-            "Cookie" to "grip_gains_token=$token",
+            "Authorization" to "Bearer ${session.token}",
+            "Cookie" to session.cookieHeader,
         )
     }
 }

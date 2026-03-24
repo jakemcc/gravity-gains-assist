@@ -89,12 +89,15 @@ class DefaultSyncCoordinator(
             }
 
             is SubmissionResult.ServerFailure -> {
+                val failureMessage = submissionResult.responseMessage?.let { responseMessage ->
+                    "Grip Gains rejected the submission: $responseMessage"
+                } ?: "Grip Gains rejected the submission with HTTP ${submissionResult.statusCode}."
                 appStateRepository.recordSyncFailure(
-                    "Grip Gains rejected the submission with HTTP ${submissionResult.statusCode}.",
+                    failureMessage,
                 )
                 SyncOutcome.Failed(
                     IllegalStateException(
-                        "Grip Gains rejected the submission with HTTP ${submissionResult.statusCode}.",
+                        failureMessage,
                     ),
                 )
             }

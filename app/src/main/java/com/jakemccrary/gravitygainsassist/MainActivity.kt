@@ -38,6 +38,8 @@ class MainActivity : ComponentActivity() {
             GravityGainsAssistTheme {
                 MainScreen(
                     viewModel = viewModel,
+                    gripGainsWebSignInSessionCapture = appContainer.gripGainsWebSignInSessionCapture,
+                    gripGainsLoginWebViewFactory = appContainer.gripGainsLoginWebViewFactory,
                     onGrantPermissions = {
                         permissionLauncher.launch(viewModel.permissionsToRequest())
                     },
