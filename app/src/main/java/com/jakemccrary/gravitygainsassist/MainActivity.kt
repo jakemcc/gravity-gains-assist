@@ -4,44 +4,50 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.activity.viewModels
+import androidx.health.connect.client.PermissionController
+import com.jakemccrary.gravitygainsassist.ui.MainScreen
+import com.jakemccrary.gravitygainsassist.ui.MainViewModel
 import com.jakemccrary.gravitygainsassist.ui.theme.GravityGainsAssistTheme
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModel.Factory(
+            healthConnectRepository = appContainer.healthConnectRepository,
+            appStateRepository = appContainer.appStateRepository,
+            authRepository = appContainer.authRepository,
+            syncScheduler = appContainer.syncScheduler,
+            healthPermissionGateway = appContainer.healthPermissionGateway,
+        )
+    }
+
+    private val appContainer: AppContainer
+        get() = (application as GravityGainsApp).appContainer
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val permissionLauncher = registerForActivityResult(
+            PermissionController.createRequestPermissionResultContract(),
+        ) { grantedPermissions ->
+            viewModel.onPermissionsResult(grantedPermissions)
+        }
+
         setContent {
             GravityGainsAssistTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                MainScreen(
+                    viewModel = viewModel,
+                    onGrantPermissions = {
+                        permissionLauncher.launch(viewModel.permissionsToRequest())
+                    },
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    GravityGainsAssistTheme {
-        Greeting("Android")
+    override fun onResume() {
+        super.onResume()
+        viewModel.refresh()
     }
 }
