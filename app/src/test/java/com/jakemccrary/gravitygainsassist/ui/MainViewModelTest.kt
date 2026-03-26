@@ -175,8 +175,6 @@ class MainViewModelTest {
     private class FakeSyncScheduler : SyncScheduler {
         var immediateSyncRequests: Int = 0
 
-        override fun scheduleDailySync() = Unit
-
         override fun enqueueImmediateSync() {
             immediateSyncRequests += 1
         }
