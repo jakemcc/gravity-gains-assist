@@ -10,6 +10,8 @@ import java.time.Instant
 interface AppStateRepository {
     val appState: Flow<AppState>
 
+    suspend fun setAutoSyncEnabled(enabled: Boolean)
+
     suspend fun recordLatestWeight(reading: WeightReading?)
 
     suspend fun recordSyncAttempt(at: Instant)
@@ -29,6 +31,12 @@ class DefaultAppStateRepository(
     private val appStateStore: AppStateStore,
 ) : AppStateRepository {
     override val appState: Flow<AppState> = appStateStore.appState
+
+    override suspend fun setAutoSyncEnabled(enabled: Boolean) {
+        appStateStore.update { currentState ->
+            currentState.copy(autoSyncEnabled = enabled)
+        }
+    }
 
     override suspend fun recordLatestWeight(reading: WeightReading?) {
         appStateStore.update { currentState ->

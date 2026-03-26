@@ -141,7 +141,7 @@ private fun MainScreenState.healthSummary(): DashboardStatusSummary {
             DashboardStatusSummary(
                 title = "Health Connect",
                 status = "Linked",
-                detail = "Reads weight now, but background sync is limited.",
+                detail = "Ready to read weight in the app. Background reads are unavailable.",
             )
         }
 
@@ -149,7 +149,7 @@ private fun MainScreenState.healthSummary(): DashboardStatusSummary {
             DashboardStatusSummary(
                 title = "Health Connect",
                 status = "Linked",
-                detail = "Foreground sync is ready. Background permission is still off.",
+                detail = "App reads are ready. Background read permission is still off.",
             )
         }
 

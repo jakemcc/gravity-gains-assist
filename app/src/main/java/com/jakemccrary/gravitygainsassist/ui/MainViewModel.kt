@@ -20,8 +20,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Clock
+import java.time.ZoneId
 
 class MainViewModel(
     private val healthConnectRepository: HealthConnectRepository,
@@ -29,6 +32,10 @@ class MainViewModel(
     private val authRepository: AuthRepository,
     private val syncScheduler: SyncScheduler,
     private val healthPermissionGateway: HealthPermissionGateway,
+    private val autoSyncPolicy: AutoSyncPolicy = AutoSyncPolicy(
+        clock = Clock.systemUTC(),
+        zoneId = ZoneId.systemDefault(),
+    ),
 ) : ViewModel() {
     private val healthStatus = MutableStateFlow<HealthConnectStatus?>(null)
     private val statusMessage = MutableStateFlow<String?>(null)
@@ -97,16 +104,25 @@ class MainViewModel(
                 .getOrNull() ?: return@launch
 
             appStateRepository.recordLatestWeight(latestWeight)
-            statusMessage.value = latestWeight.toReadMessage()
+            val currentAppState = appStateRepository.appState.first()
+            val autoSyncQueued = if (autoSyncPolicy.shouldEnqueueSync(currentAppState)) {
+                syncScheduler.enqueueImmediateSync()
+                true
+            } else {
+                false
+            }
+            statusMessage.value = latestWeight.toReadMessage(autoSyncQueued)
         }
     }
 
-    fun scheduleDailySync() {
-        syncScheduler.scheduleDailySync()
-        statusMessage.value = if (healthStatus.value?.isBackgroundReadFeatureAvailable == true) {
-            "Daily sync scheduled."
-        } else {
-            "Daily sync scheduled. Background reads will wait for platform support."
+    fun setAutoSyncEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            appStateRepository.setAutoSyncEnabled(enabled)
+            statusMessage.value = if (enabled) {
+                "Auto-sync enabled."
+            } else {
+                "Auto-sync disabled."
+            }
         }
     }
 
@@ -135,6 +151,10 @@ class MainViewModel(
         private val authRepository: AuthRepository,
         private val syncScheduler: SyncScheduler,
         private val healthPermissionGateway: HealthPermissionGateway,
+        private val autoSyncPolicy: AutoSyncPolicy = AutoSyncPolicy(
+            clock = Clock.systemUTC(),
+            zoneId = ZoneId.systemDefault(),
+        ),
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -144,12 +164,14 @@ class MainViewModel(
                 authRepository = authRepository,
                 syncScheduler = syncScheduler,
                 healthPermissionGateway = healthPermissionGateway,
+                autoSyncPolicy = autoSyncPolicy,
             ) as T
         }
     }
 }
 
 data class MainScreenState(
+    val autoSyncEnabled: Boolean = false,
     val healthStatus: HealthConnectStatus? = null,
     val sessionState: GripGainsSessionState = GripGainsSessionState(),
     val lastWeight: WeightReading? = null,
@@ -167,6 +189,7 @@ private fun AppState.toScreenState(
     statusMessage: String?,
 ): MainScreenState {
     return MainScreenState(
+        autoSyncEnabled = autoSyncEnabled,
         healthStatus = healthStatus,
         sessionState = sessionState,
         lastWeight = lastWeight,
@@ -179,11 +202,16 @@ private fun AppState.toScreenState(
     )
 }
 
-private fun WeightReading?.toReadMessage(): String {
+private fun WeightReading?.toReadMessage(autoSyncQueued: Boolean): String {
     return if (this == null) {
         "No weight records found."
     } else {
-        "Read ${"%.1f".format(kilograms)} kg from Health Connect."
+        val baseMessage = "Read ${"%.1f".format(kilograms)} kg from Health Connect."
+        if (autoSyncQueued) {
+            "$baseMessage Auto-sync queued."
+        } else {
+            baseMessage
+        }
     }
 }
 

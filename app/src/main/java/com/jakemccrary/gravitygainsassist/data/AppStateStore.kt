@@ -3,6 +3,7 @@ package com.jakemccrary.gravitygainsassist.data
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -40,6 +41,7 @@ class PreferenceAppStateStore(
         val lastWeightAt = this[LAST_WEIGHT_AT_KEY]
 
         return AppState(
+            autoSyncEnabled = this[AUTO_SYNC_ENABLED_KEY] ?: false,
             lastWeight = if (lastWeightAt == null) {
                 null
             } else {
@@ -62,6 +64,8 @@ class PreferenceAppStateStore(
     }
 
     private fun MutablePreferences.writeAppState(appState: AppState) {
+        this[AUTO_SYNC_ENABLED_KEY] = appState.autoSyncEnabled
+
         if (appState.lastWeight != null) {
             val weight = appState.lastWeight
             this[LAST_WEIGHT_KG_KEY] = weight.kilograms
@@ -105,6 +109,7 @@ class PreferenceAppStateStore(
     }
 
     private companion object {
+        val AUTO_SYNC_ENABLED_KEY = booleanPreferencesKey("auto_sync_enabled")
         val LAST_WEIGHT_KG_KEY = doublePreferencesKey("last_weight_kg")
         val LAST_WEIGHT_AT_KEY = longPreferencesKey("last_weight_at")
         val LAST_SYNC_ATTEMPT_AT_KEY = longPreferencesKey("last_sync_attempt_at")

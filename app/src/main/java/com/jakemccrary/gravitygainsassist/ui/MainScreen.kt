@@ -25,6 +25,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,6 +60,7 @@ fun MainScreen(
     gripGainsWebSignInSessionCapture: GripGainsWebSignInSessionCapture,
     gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory,
     onGrantPermissions: () -> Unit,
+    onSetAutoSyncEnabled: (Boolean) -> Unit,
 ) {
     val screenState by viewModel.screenState.collectAsStateWithLifecycle()
     var isShowingGripGainsSignIn by rememberSaveable { mutableStateOf(false) }
@@ -68,8 +71,8 @@ fun MainScreen(
             onGrantPermissions = onGrantPermissions,
             onStartGripGainsSignIn = { isShowingGripGainsSignIn = true },
             onClearGripGainsSession = viewModel::clearGripGainsSession,
+            onSetAutoSyncEnabled = onSetAutoSyncEnabled,
             onReadLatestWeight = viewModel::readLatestWeightNow,
-            onScheduleDailySync = viewModel::scheduleDailySync,
             onRunSyncNow = viewModel::runSyncNow,
             innerPadding = innerPadding,
         )
@@ -94,8 +97,8 @@ private fun MainScreenContent(
     onGrantPermissions: () -> Unit,
     onStartGripGainsSignIn: () -> Unit,
     onClearGripGainsSession: () -> Unit,
+    onSetAutoSyncEnabled: (Boolean) -> Unit,
     onReadLatestWeight: () -> Unit,
-    onScheduleDailySync: () -> Unit,
     onRunSyncNow: () -> Unit,
     innerPadding: PaddingValues,
 ) {
@@ -188,8 +191,8 @@ private fun MainScreenContent(
                 screenState = screenState,
                 onStartGripGainsSignIn = onStartGripGainsSignIn,
                 onClearGripGainsSession = onClearGripGainsSession,
+                onSetAutoSyncEnabled = onSetAutoSyncEnabled,
                 onReadLatestWeight = onReadLatestWeight,
-                onScheduleDailySync = onScheduleDailySync,
             )
         }
     }
@@ -389,8 +392,8 @@ private fun UtilityActionsCard(
     screenState: MainScreenState,
     onStartGripGainsSignIn: () -> Unit,
     onClearGripGainsSession: () -> Unit,
+    onSetAutoSyncEnabled: (Boolean) -> Unit,
     onReadLatestWeight: () -> Unit,
-    onScheduleDailySync: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -404,6 +407,41 @@ private fun UtilityActionsCard(
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 6.dp),
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = "Auto-sync",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "Sync automatically after reading a new weight when today has not synced yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Switch(
+                    checked = screenState.autoSyncEnabled,
+                    onCheckedChange = onSetAutoSyncEnabled,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    ),
+                )
+            }
+
             Text(
                 text = "More actions",
                 style = MaterialTheme.typography.labelLarge,
@@ -417,15 +455,6 @@ private fun UtilityActionsCard(
             ) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text("Read latest weight")
-                }
-            }
-
-            TextButton(
-                onClick = onScheduleDailySync,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    Text("Schedule daily sync")
                 }
             }
 

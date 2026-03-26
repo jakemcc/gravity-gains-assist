@@ -3,6 +3,7 @@ package com.jakemccrary.gravitygainsassist.model
 import java.time.Instant
 
 data class AppState(
+    val autoSyncEnabled: Boolean = false,
     val lastWeight: WeightReading? = null,
     val lastSyncAttemptAt: Instant? = null,
     val lastSyncSuccessAt: Instant? = null,

@@ -1,14 +1,21 @@
 package com.jakemccrary.gravitygainsassist
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.jakemccrary.gravitygainsassist.ui.MainScreen
 import com.jakemccrary.gravitygainsassist.ui.MainViewModel
+import com.jakemccrary.gravitygainsassist.ui.AutoSyncPolicy
 import com.jakemccrary.gravitygainsassist.ui.theme.GravityGainsAssistTheme
+import java.time.Clock
+import java.time.ZoneId
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
@@ -18,6 +25,7 @@ class MainActivity : ComponentActivity() {
             authRepository = appContainer.authRepository,
             syncScheduler = appContainer.syncScheduler,
             healthPermissionGateway = appContainer.healthPermissionGateway,
+            autoSyncPolicy = AutoSyncPolicy(Clock.systemUTC(), ZoneId.systemDefault()),
         )
     }
 
@@ -33,6 +41,9 @@ class MainActivity : ComponentActivity() {
         ) { grantedPermissions ->
             viewModel.onPermissionsResult(grantedPermissions)
         }
+        val notificationPermissionLauncher = registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { _ -> }
 
         setContent {
             GravityGainsAssistTheme {
@@ -43,6 +54,12 @@ class MainActivity : ComponentActivity() {
                     onGrantPermissions = {
                         permissionLauncher.launch(viewModel.permissionsToRequest())
                     },
+                    onSetAutoSyncEnabled = { enabled ->
+                        if (enabled && !hasNotificationPermission()) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        viewModel.setAutoSyncEnabled(enabled)
+                    },
                 )
             }
         }
@@ -51,5 +68,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refresh()
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }

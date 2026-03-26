@@ -19,6 +19,7 @@ class DefaultSyncCoordinator(
     private val appStateRepository: AppStateRepository,
     private val websiteSubmissionRepository: WebsiteSubmissionRepository,
     private val clock: Clock,
+    private val syncFailureNotifier: SyncFailureNotifier = NoOpSyncFailureNotifier,
 ) : SyncCoordinator {
     override suspend fun runSync(trigger: SyncTrigger): SyncOutcome {
         val attemptAt = clock.instant()
@@ -54,7 +55,7 @@ class DefaultSyncCoordinator(
                 }
             }
         } catch (throwable: Throwable) {
-            appStateRepository.recordSyncFailure("Unexpected sync failure.")
+            recordFailure("Unexpected sync failure.")
             SyncOutcome.Failed(throwable)
         }
     }
@@ -84,7 +85,7 @@ class DefaultSyncCoordinator(
             SubmissionResult.AuthExpired -> skip(SyncSkipReason.INVALID_SESSION)
 
             is SubmissionResult.NetworkFailure -> {
-                appStateRepository.recordSyncFailure("Network error while submitting to Grip Gains.")
+                recordFailure("Network error while submitting to Grip Gains.")
                 SyncOutcome.Failed(submissionResult.cause)
             }
 
@@ -92,9 +93,7 @@ class DefaultSyncCoordinator(
                 val failureMessage = submissionResult.responseMessage?.let { responseMessage ->
                     "Grip Gains rejected the submission: $responseMessage"
                 } ?: "Grip Gains rejected the submission with HTTP ${submissionResult.statusCode}."
-                appStateRepository.recordSyncFailure(
-                    failureMessage,
-                )
+                recordFailure(failureMessage)
                 SyncOutcome.Failed(
                     IllegalStateException(
                         failureMessage,
@@ -103,9 +102,14 @@ class DefaultSyncCoordinator(
             }
 
             is SubmissionResult.UnknownFailure -> {
-                appStateRepository.recordSyncFailure("Unexpected failure while submitting to Grip Gains.")
+                recordFailure("Unexpected failure while submitting to Grip Gains.")
                 SyncOutcome.Failed(submissionResult.cause)
             }
         }
+    }
+
+    private suspend fun recordFailure(message: String) {
+        appStateRepository.recordSyncFailure(message)
+        syncFailureNotifier.notifyFailure(message)
     }
 }

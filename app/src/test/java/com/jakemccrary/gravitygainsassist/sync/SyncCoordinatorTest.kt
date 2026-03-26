@@ -180,6 +180,7 @@ class SyncCoordinatorTest {
                 result = SubmissionResult.NetworkFailure(java.io.IOException("offline")),
             ),
             clock = fixedClock,
+            syncFailureNotifier = FakeSyncFailureNotifier(),
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -195,6 +196,7 @@ class SyncCoordinatorTest {
     fun `server failure with response detail is shown in failure message`() = runTest {
         val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
         val appStateRepository = FakeAppStateRepository()
+        val notifier = FakeSyncFailureNotifier()
         val coordinator = DefaultSyncCoordinator(
             healthConnectRepository = FakeHealthConnectRepository(
                 status = availableStatus(),
@@ -208,6 +210,7 @@ class SyncCoordinatorTest {
                 ),
             ),
             clock = fixedClock,
+            syncFailureNotifier = notifier,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -216,6 +219,10 @@ class SyncCoordinatorTest {
         assertEquals(
             "Grip Gains rejected the submission: A bodyweight entry already exists for this date",
             appStateRepository.lastFailureMessage,
+        )
+        assertEquals(
+            listOf("Grip Gains rejected the submission: A bodyweight entry already exists for this date"),
+            notifier.messages,
         )
     }
 
@@ -229,11 +236,34 @@ class SyncCoordinatorTest {
             appStateRepository = FakeAppStateRepository(),
             websiteSubmissionRepository = FakeWebsiteSubmissionRepository(),
             clock = fixedClock,
+            syncFailureNotifier = FakeSyncFailureNotifier(),
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
 
         assertTrue(outcome is SyncOutcome.Failed)
+    }
+
+    @Test
+    fun `network failures trigger a sync failure notification`() = runTest {
+        val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
+        val notifier = FakeSyncFailureNotifier()
+        val coordinator = DefaultSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                status = availableStatus(),
+                latestWeight = latestWeight,
+            ),
+            appStateRepository = FakeAppStateRepository(),
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                result = SubmissionResult.NetworkFailure(java.io.IOException("offline")),
+            ),
+            clock = fixedClock,
+            syncFailureNotifier = notifier,
+        )
+
+        coordinator.runSync(SyncTrigger.MANUAL)
+
+        assertEquals(listOf("Network error while submitting to Grip Gains."), notifier.messages)
     }
 
     private fun availableStatus(
@@ -293,6 +323,10 @@ class SyncCoordinatorTest {
 
         override val appState: Flow<AppState> = backingState
 
+        override suspend fun setAutoSyncEnabled(enabled: Boolean) {
+            backingState.value = backingState.value.copy(autoSyncEnabled = enabled)
+        }
+
         override suspend fun recordLatestWeight(reading: WeightReading?) {
             backingState.value = backingState.value.copy(lastWeight = reading)
         }
@@ -323,6 +357,14 @@ class SyncCoordinatorTest {
                 lastSyncSuccessAt = at,
                 lastSubmittedWeight = submittedWeight,
             )
+        }
+    }
+
+    private class FakeSyncFailureNotifier : SyncFailureNotifier {
+        val messages = mutableListOf<String>()
+
+        override fun notifyFailure(message: String) {
+            messages += message
         }
     }
 }

@@ -3,4 +3,7 @@
     <string name="health_permissions_rationale_title">Health permissions</string>
     <string name="health_permissions_rationale_body">This placeholder screen explains why Gravity Gains Assist reads weight data from Health Connect. The app only reads your latest weight so it can prepare future syncs.</string>
     <string name="close">Close</string>
+    <string name="sync_failure_notification_title">Gravity Gains sync failed</string>
+    <string name="sync_failure_notification_channel_name">Sync failures</string>
+    <string name="sync_failure_notification_channel_description">Notifications for automatic sync failures.</string>
 </resources>

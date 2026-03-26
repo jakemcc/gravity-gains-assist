@@ -12,8 +12,10 @@ import com.jakemccrary.gravitygainsassist.health.HealthConnectManager
 import com.jakemccrary.gravitygainsassist.health.HealthConnectRepository
 import com.jakemccrary.gravitygainsassist.health.HealthPermissionGateway
 import com.jakemccrary.gravitygainsassist.sync.AppWorkerFactory
+import com.jakemccrary.gravitygainsassist.sync.AndroidSyncFailureNotifier
 import com.jakemccrary.gravitygainsassist.sync.DefaultSyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.SyncCoordinator
+import com.jakemccrary.gravitygainsassist.sync.SyncFailureNotifier
 import com.jakemccrary.gravitygainsassist.sync.SyncScheduler
 import com.jakemccrary.gravitygainsassist.sync.WorkManagerSyncScheduler
 import com.jakemccrary.gravitygainsassist.website.AuthRepository
@@ -81,11 +83,14 @@ class AppContainer private constructor(
                     ),
                     gripGainsApi = HttpUrlConnectionGripGainsApi(),
                 )
+            val syncFailureNotifier: SyncFailureNotifier =
+                AndroidSyncFailureNotifier(applicationContext)
             val syncCoordinator: SyncCoordinator = DefaultSyncCoordinator(
                 healthConnectRepository = healthConnectRepository,
                 appStateRepository = appStateRepository,
                 websiteSubmissionRepository = websiteSubmissionRepository,
                 clock = clock,
+                syncFailureNotifier = syncFailureNotifier,
             )
             val syncScheduler: SyncScheduler = WorkManagerSyncScheduler(applicationContext)
             val workerFactory = AppWorkerFactory(syncCoordinator)

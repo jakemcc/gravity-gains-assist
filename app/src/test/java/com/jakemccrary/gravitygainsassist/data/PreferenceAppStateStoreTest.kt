@@ -30,6 +30,7 @@ class PreferenceAppStateStoreTest {
 
         store.update {
             AppState(
+                autoSyncEnabled = true,
                 lastWeight = initialWeight,
                 lastSyncAttemptAt = attemptAt,
                 lastSyncSuccessAt = successAt,
@@ -45,6 +46,7 @@ class PreferenceAppStateStoreTest {
         store.update { AppState() }
 
         val clearedState = store.appState.first()
+        assertEquals(false, clearedState.autoSyncEnabled)
         assertNull(clearedState.lastWeight)
         assertNull(clearedState.lastSyncAttemptAt)
         assertNull(clearedState.lastSyncSuccessAt)
@@ -72,6 +74,7 @@ class PreferenceAppStateStoreTest {
 
         store.update {
             AppState(
+                autoSyncEnabled = true,
                 lastWeight = weight,
                 lastSyncAttemptAt = attemptAt,
                 lastSyncSuccessAt = successAt,
@@ -82,6 +85,7 @@ class PreferenceAppStateStoreTest {
         }
 
         val persistedState = store.appState.first()
+        assertEquals(true, persistedState.autoSyncEnabled)
         assertEquals(weight, persistedState.lastWeight)
         assertEquals(attemptAt, persistedState.lastSyncAttemptAt)
         assertEquals(successAt, persistedState.lastSyncSuccessAt)
