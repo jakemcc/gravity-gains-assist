@@ -1,24 +1,34 @@
 package com.jakemccrary.gravitygainsassist.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,25 +37,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
-import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
-import com.jakemccrary.gravitygainsassist.model.SubmittedWeight
-import com.jakemccrary.gravitygainsassist.model.WeightReading
 import com.jakemccrary.gravitygainsassist.website.GripGainsLoginWebViewFactory
 import com.jakemccrary.gravitygainsassist.website.GripGainsSession
 import com.jakemccrary.gravitygainsassist.website.GripGainsSessionState
 import com.jakemccrary.gravitygainsassist.website.GripGainsWebSignInSessionCapture
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import java.util.Locale
 
 @Composable
 fun MainScreen(
@@ -94,148 +99,356 @@ private fun MainScreenContent(
     onRunSyncNow: () -> Unit,
     innerPadding: PaddingValues,
 ) {
-    Column(
+    val dashboardModel = screenState.toDashboardUiModel()
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.background,
+                        MaterialTheme.colorScheme.surface,
+                    ),
+                ),
+            ),
     ) {
-        Text(
-            text = "Gravity Gains Assist",
-            style = MaterialTheme.typography.headlineMedium,
-        )
-        StatusRow("Health Connect", screenState.healthStatus.availabilityText())
-        StatusRow("Weight permission", screenState.healthStatus.permissionText())
-        StatusRow(
-            "Background-read feature",
-            screenState.healthStatus.backgroundAvailabilityText(),
-        )
-        StatusRow("Grip Gains session", screenState.sessionState.status.displayText())
-        StatusRow("Last weight", screenState.lastWeight.displayText())
-        StatusRow("Last submitted weight", screenState.lastSubmittedWeight.displayText())
-        StatusRow("Last sync attempt", screenState.lastSyncAttemptAt.displayText())
-        StatusRow("Last successful sync", screenState.lastSyncSuccessAt.displayText())
-        StatusRow("Last sync skip", screenState.lastSyncSkippedReasonText ?: "none")
-        StatusRow("Last sync failure", screenState.lastSyncFailureMessage ?: "none")
-
-        HorizontalDivider(modifier = Modifier.fillMaxWidth())
-
-        Button(onClick = onStartGripGainsSignIn) {
-            Text("Sign in to Grip Gains")
-        }
-        Button(onClick = onClearGripGainsSession) {
-            Text("Clear Grip Gains sign-in")
-        }
-        Button(
-            onClick = onGrantPermissions,
-            enabled = screenState.healthStatus?.availability == HealthConnectAvailability.AVAILABLE,
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text("Grant permissions")
-        }
-        Button(
-            onClick = onReadLatestWeight,
-            enabled = screenState.healthStatus?.availability == HealthConnectAvailability.AVAILABLE,
-        ) {
-            Text("Read latest weight now")
-        }
-        Button(onClick = onScheduleDailySync) {
-            Text("Schedule daily sync")
-        }
-        Button(onClick = onRunSyncNow) {
-            Text("Run sync now")
-        }
+            WeightHeroCard(dashboardModel)
 
-        screenState.statusMessage?.let { message ->
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 8.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                DashboardStatusCard(
+                    summary = dashboardModel.healthSummary,
+                    modifier = Modifier.weight(1f),
+                )
+                DashboardStatusCard(
+                    summary = dashboardModel.sessionSummary,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            SyncSummaryCard(dashboardModel.syncSummary)
+
+            dashboardModel.statusMessage?.let { message ->
+                InlineNoteCard(message)
+            }
+
+            Button(
+                onClick = onRunSyncNow,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            ) {
+                Text(
+                    text = "Run sync now",
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            dashboardModel.setupAction?.let { action ->
+                FilledTonalButton(
+                    onClick = {
+                        when (action.type) {
+                            DashboardActionType.GRANT_PERMISSIONS -> onGrantPermissions()
+                            DashboardActionType.SIGN_IN -> onStartGripGainsSignIn()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(22.dp),
+                    enabled = action.type != DashboardActionType.GRANT_PERMISSIONS ||
+                        screenState.healthStatus?.availability == HealthConnectAvailability.AVAILABLE,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                ) {
+                    Text(
+                        text = action.label,
+                        modifier = Modifier.padding(vertical = 2.dp),
+                    )
+                }
+            }
+
+            UtilityActionsCard(
+                screenState = screenState,
+                onStartGripGainsSignIn = onStartGripGainsSignIn,
+                onClearGripGainsSession = onClearGripGainsSession,
+                onReadLatestWeight = onReadLatestWeight,
+                onScheduleDailySync = onScheduleDailySync,
             )
         }
     }
 }
 
 @Composable
-private fun StatusRow(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun WeightHeroCard(dashboardModel: DashboardUiModel) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        ),
+        shape = RoundedCornerShape(28.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(22.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            dashboardModel.contextLine?.let { line ->
+                ContextPill(line)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                Text(
+                    text = dashboardModel.weightValue,
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = dashboardModel.weightUnit,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+            }
+
+            Text(
+                text = dashboardModel.weightMeta,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            dashboardModel.weightSupport?.let { support ->
+                Text(
+                    text = support,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContextPill(text: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        contentColor = MaterialTheme.colorScheme.primary,
+        shape = RoundedCornerShape(999.dp),
+    ) {
         Text(
-            text = label,
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             style = MaterialTheme.typography.labelLarge,
         )
+    }
+}
+
+@Composable
+private fun DashboardStatusCard(
+    summary: DashboardStatusSummary,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f),
+        ),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = summary.title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = summary.status,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = summary.detail,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SyncSummaryCard(summary: DashboardSyncSummary) {
+    val accentColor = when (summary.tone) {
+        SyncSummaryTone.NEUTRAL -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+        SyncSummaryTone.SUCCESS -> MaterialTheme.colorScheme.primary
+        SyncSummaryTone.WARNING -> Color(0xFFF2C879)
+        SyncSummaryTone.ERROR -> MaterialTheme.colorScheme.error
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = accentColor.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(24.dp),
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+        ),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .background(
+                        color = accentColor,
+                        shape = RoundedCornerShape(999.dp),
+                    )
+                    .heightIn(min = 56.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = summary.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = accentColor,
+                )
+                Text(
+                    text = summary.detail,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                summary.supportingText?.let { supportingText ->
+                    Text(
+                        text = supportingText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineNoteCard(message: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        ),
+        shape = RoundedCornerShape(22.dp),
+    ) {
         Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
+            text = message,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
 
-private fun HealthConnectStatus?.availabilityText(): String {
-    return when (this?.availability) {
-        HealthConnectAvailability.AVAILABLE -> "Available"
-        HealthConnectAvailability.UPDATE_REQUIRED -> "Provider update required"
-        HealthConnectAvailability.UNAVAILABLE -> "Unavailable"
-        null -> "Checking..."
-    }
-}
+@Composable
+private fun UtilityActionsCard(
+    screenState: MainScreenState,
+    onStartGripGainsSignIn: () -> Unit,
+    onClearGripGainsSession: () -> Unit,
+    onReadLatestWeight: () -> Unit,
+    onScheduleDailySync: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+        ),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = "More actions",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            )
 
-private fun HealthConnectStatus?.permissionText(): String {
-    return if (this == null) {
-        "Checking..."
-    } else if (isWeightPermissionGranted) {
-        "Granted"
-    } else {
-        "Not granted"
-    }
-}
+            TextButton(
+                onClick = onReadLatestWeight,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Read latest weight")
+                }
+            }
 
-private fun HealthConnectStatus?.backgroundAvailabilityText(): String {
-    return when {
-        this == null -> "Checking..."
-        isBackgroundReadFeatureAvailable -> "Available"
-        else -> "Unavailable"
-    }
-}
+            TextButton(
+                onClick = onScheduleDailySync,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text("Schedule daily sync")
+                }
+            }
 
-private fun WeightReading?.displayText(): String {
-    return if (this == null) {
-        "none"
-    } else {
-        "${formatKilograms(kilograms)} kg at ${recordedAt.displayText()}"
-    }
-}
-
-private fun SubmittedWeight?.displayText(): String {
-    return if (this == null) {
-        "none"
-    } else {
-        "${formatPounds(weightLbs)} lbs on $date"
-    }
-}
-
-private fun Instant?.displayText(): String {
-    return this?.let { instant ->
-        DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM)
-            .withLocale(Locale.US)
-            .withZone(ZoneId.systemDefault())
-            .format(instant)
-    } ?: "none"
-}
-
-private fun formatKilograms(value: Double): String {
-    return String.format(Locale.US, "%.1f", value)
-}
-
-private fun formatPounds(value: Double): String {
-    return String.format(Locale.US, "%.1f", value)
-}
-
-private fun GripGainsSessionState.Status.displayText(): String {
-    return when (this) {
-        GripGainsSessionState.Status.NO_TOKEN -> "Not signed in"
-        GripGainsSessionState.Status.TOKEN_PRESENT -> "Signed in"
-        GripGainsSessionState.Status.INVALID_SESSION -> "Invalid session"
+            if (screenState.sessionState.status == GripGainsSessionState.Status.TOKEN_PRESENT) {
+                TextButton(
+                    onClick = onClearGripGainsSession,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Clear saved sign-in")
+                    }
+                }
+            } else {
+                TextButton(
+                    onClick = onStartGripGainsSignIn,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("Sign in to Grip Gains")
+                    }
+                }
+            }
+        }
     }
 }
 

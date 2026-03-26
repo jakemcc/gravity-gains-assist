@@ -2,10 +2,17 @@ package com.jakemccrary.gravitygainsassist.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val MossGreen = Color(0xFFD2F2A0)
+val MossGreenMuted = Color(0xFFA8C77A)
+val MossGreenDeep = Color(0xFF27341C)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val Night = Color(0xFF0A0F0A)
+val NightSoft = Color(0xFF111612)
+val ForestSurface = Color(0xFF171D19)
+val ForestSurfaceRaised = Color(0xFF1D2620)
+val Mist = Color(0xFFF4F6EF)
+val MistMuted = Color(0xFFAAB3A5)
+val OutlineSoft = Color(0xFF334037)
+
+val AlertSoft = Color(0xFFF2C879)
+val ErrorSoft = Color(0xFFFFB4AB)
