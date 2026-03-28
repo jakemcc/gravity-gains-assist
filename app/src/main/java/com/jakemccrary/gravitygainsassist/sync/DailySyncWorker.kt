@@ -33,6 +33,7 @@ class DailySyncWorkerDelegate(
 
 class AppWorkerFactory(
     private val syncCoordinator: SyncCoordinator,
+    private val autoSyncCoordinator: AutoSyncCoordinator,
 ) : WorkerFactory() {
     override fun createWorker(
         appContext: Context,
@@ -45,6 +46,14 @@ class AppWorkerFactory(
                     appContext = appContext,
                     workerParameters = workerParameters,
                     delegate = DailySyncWorkerDelegate(syncCoordinator),
+                )
+            }
+
+            AutoSyncWorker::class.qualifiedName -> {
+                AutoSyncWorker(
+                    appContext = appContext,
+                    workerParameters = workerParameters,
+                    delegate = AutoSyncWorkerDelegate(autoSyncCoordinator),
                 )
             }
 

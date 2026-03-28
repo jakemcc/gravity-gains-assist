@@ -12,7 +12,10 @@ import com.jakemccrary.gravitygainsassist.health.HealthConnectManager
 import com.jakemccrary.gravitygainsassist.health.HealthConnectRepository
 import com.jakemccrary.gravitygainsassist.health.HealthPermissionGateway
 import com.jakemccrary.gravitygainsassist.sync.AppWorkerFactory
+import com.jakemccrary.gravitygainsassist.sync.AutoSyncCoordinator
+import com.jakemccrary.gravitygainsassist.sync.AutoSyncPlanner
 import com.jakemccrary.gravitygainsassist.sync.AndroidSyncFailureNotifier
+import com.jakemccrary.gravitygainsassist.sync.DefaultAutoSyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.DefaultSyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.SyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.SyncFailureNotifier
@@ -43,6 +46,7 @@ class AppContainer private constructor(
     val gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory,
     val syncScheduler: SyncScheduler,
     val syncCoordinator: SyncCoordinator,
+    val autoSyncCoordinator: AutoSyncCoordinator,
     val workerFactory: AppWorkerFactory,
 ) {
     companion object {
@@ -66,6 +70,7 @@ class AppContainer private constructor(
             val healthConnectRepository: HealthConnectRepository = DefaultHealthConnectRepository(
                 healthConnectManager = healthConnectManager,
                 healthPermissionGateway = healthPermissionGateway,
+                zoneId = zoneId,
             )
             val authRepository: AuthRepository = DefaultAuthRepository(
                 sessionStore = SecurePreferencesSessionStore(applicationContext),
@@ -90,10 +95,26 @@ class AppContainer private constructor(
                 appStateRepository = appStateRepository,
                 websiteSubmissionRepository = websiteSubmissionRepository,
                 clock = clock,
+                zoneId = zoneId,
                 syncFailureNotifier = syncFailureNotifier,
             )
-            val syncScheduler: SyncScheduler = WorkManagerSyncScheduler(applicationContext)
-            val workerFactory = AppWorkerFactory(syncCoordinator)
+            val syncScheduler: SyncScheduler = WorkManagerSyncScheduler(
+                context = applicationContext,
+                clock = clock,
+                zoneId = zoneId,
+            )
+            val autoSyncCoordinator: AutoSyncCoordinator = DefaultAutoSyncCoordinator(
+                healthConnectRepository = healthConnectRepository,
+                appStateRepository = appStateRepository,
+                authRepository = authRepository,
+                websiteSubmissionRepository = websiteSubmissionRepository,
+                syncScheduler = syncScheduler,
+                autoSyncPlanner = AutoSyncPlanner(clock = clock, zoneId = zoneId),
+                clock = clock,
+                zoneId = zoneId,
+                syncFailureNotifier = syncFailureNotifier,
+            )
+            val workerFactory = AppWorkerFactory(syncCoordinator, autoSyncCoordinator)
 
             return AppContainer(
                 healthPermissionGateway = healthPermissionGateway,
@@ -104,6 +125,7 @@ class AppContainer private constructor(
                 gripGainsLoginWebViewFactory = gripGainsLoginWebViewFactory,
                 syncScheduler = syncScheduler,
                 syncCoordinator = syncCoordinator,
+                autoSyncCoordinator = autoSyncCoordinator,
                 workerFactory = workerFactory,
             )
         }

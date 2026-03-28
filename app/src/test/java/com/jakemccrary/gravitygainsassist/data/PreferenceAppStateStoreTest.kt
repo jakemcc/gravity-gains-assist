@@ -34,6 +34,11 @@ class PreferenceAppStateStoreTest {
                 lastWeight = initialWeight,
                 lastSyncAttemptAt = attemptAt,
                 lastSyncSuccessAt = successAt,
+                preferredNextSyncMinutesOfDay = (7 * 60) + 12,
+                nextAutoSyncCheckAt = Instant.parse("2026-03-13T11:42:00Z"),
+                weightPermissionGranted = true,
+                backgroundReadFeatureAvailable = true,
+                backgroundReadPermissionGranted = false,
                 lastSyncSkippedReason = SyncSkipReason.MISSING_SESSION,
                 lastSyncFailureMessage = "no session",
                 lastSubmittedWeight = SubmittedWeight(
@@ -50,6 +55,11 @@ class PreferenceAppStateStoreTest {
         assertNull(clearedState.lastWeight)
         assertNull(clearedState.lastSyncAttemptAt)
         assertNull(clearedState.lastSyncSuccessAt)
+        assertNull(clearedState.preferredNextSyncMinutesOfDay)
+        assertNull(clearedState.nextAutoSyncCheckAt)
+        assertNull(clearedState.weightPermissionGranted)
+        assertNull(clearedState.backgroundReadFeatureAvailable)
+        assertNull(clearedState.backgroundReadPermissionGranted)
         assertNull(clearedState.lastSyncSkippedReason)
         assertNull(clearedState.lastSyncFailureMessage)
         assertNull(clearedState.lastSubmittedWeight)
@@ -78,6 +88,11 @@ class PreferenceAppStateStoreTest {
                 lastWeight = weight,
                 lastSyncAttemptAt = attemptAt,
                 lastSyncSuccessAt = successAt,
+                preferredNextSyncMinutesOfDay = (7 * 60) + 12,
+                nextAutoSyncCheckAt = Instant.parse("2026-03-14T11:42:00Z"),
+                weightPermissionGranted = true,
+                backgroundReadFeatureAvailable = true,
+                backgroundReadPermissionGranted = true,
                 lastSyncSkippedReason = SyncSkipReason.NO_WEIGHT_DATA,
                 lastSyncFailureMessage = "no data",
                 lastSubmittedWeight = submittedWeight,
@@ -89,6 +104,11 @@ class PreferenceAppStateStoreTest {
         assertEquals(weight, persistedState.lastWeight)
         assertEquals(attemptAt, persistedState.lastSyncAttemptAt)
         assertEquals(successAt, persistedState.lastSyncSuccessAt)
+        assertEquals((7 * 60) + 12, persistedState.preferredNextSyncMinutesOfDay)
+        assertEquals(Instant.parse("2026-03-14T11:42:00Z"), persistedState.nextAutoSyncCheckAt)
+        assertEquals(true, persistedState.weightPermissionGranted)
+        assertEquals(true, persistedState.backgroundReadFeatureAvailable)
+        assertEquals(true, persistedState.backgroundReadPermissionGranted)
         assertEquals(SyncSkipReason.NO_WEIGHT_DATA, persistedState.lastSyncSkippedReason)
         assertEquals("no data", persistedState.lastSyncFailureMessage)
         assertEquals(submittedWeight, persistedState.lastSubmittedWeight)

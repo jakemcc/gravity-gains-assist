@@ -1,6 +1,7 @@
 package com.jakemccrary.gravitygainsassist.data
 
 import com.jakemccrary.gravitygainsassist.model.AppState
+import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
 import com.jakemccrary.gravitygainsassist.model.SubmittedWeight
 import com.jakemccrary.gravitygainsassist.model.SyncSkipReason
 import com.jakemccrary.gravitygainsassist.model.WeightReading
@@ -24,7 +25,12 @@ interface AppStateRepository {
         at: Instant,
         latestWeight: WeightReading?,
         submittedWeight: SubmittedWeight,
+        preferredNextSyncMinutesOfDay: Int,
     )
+
+    suspend fun recordHealthConnectStatus(status: HealthConnectStatus)
+
+    suspend fun recordNextAutoSyncCheck(at: Instant?)
 }
 
 class DefaultAppStateRepository(
@@ -34,7 +40,10 @@ class DefaultAppStateRepository(
 
     override suspend fun setAutoSyncEnabled(enabled: Boolean) {
         appStateStore.update { currentState ->
-            currentState.copy(autoSyncEnabled = enabled)
+            currentState.copy(
+                autoSyncEnabled = enabled,
+                nextAutoSyncCheckAt = if (enabled) currentState.nextAutoSyncCheckAt else null,
+            )
         }
     }
 
@@ -76,15 +85,33 @@ class DefaultAppStateRepository(
         at: Instant,
         latestWeight: WeightReading?,
         submittedWeight: SubmittedWeight,
+        preferredNextSyncMinutesOfDay: Int,
     ) {
         appStateStore.update { currentState ->
             currentState.copy(
                 lastWeight = latestWeight ?: currentState.lastWeight,
                 lastSyncSuccessAt = at,
+                preferredNextSyncMinutesOfDay = preferredNextSyncMinutesOfDay,
                 lastSyncSkippedReason = null,
                 lastSyncFailureMessage = null,
                 lastSubmittedWeight = submittedWeight,
             )
+        }
+    }
+
+    override suspend fun recordHealthConnectStatus(status: HealthConnectStatus) {
+        appStateStore.update { currentState ->
+            currentState.copy(
+                weightPermissionGranted = status.isWeightPermissionGranted,
+                backgroundReadFeatureAvailable = status.isBackgroundReadFeatureAvailable,
+                backgroundReadPermissionGranted = status.isBackgroundReadPermissionGranted,
+            )
+        }
+    }
+
+    override suspend fun recordNextAutoSyncCheck(at: Instant?) {
+        appStateStore.update { currentState ->
+            currentState.copy(nextAutoSyncCheckAt = at)
         }
     }
 }

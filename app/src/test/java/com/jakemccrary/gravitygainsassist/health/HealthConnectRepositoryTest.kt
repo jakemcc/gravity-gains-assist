@@ -8,6 +8,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 class HealthConnectRepositoryTest {
     private val permissionGateway = HealthPermissionGateway()
@@ -17,7 +19,7 @@ class HealthConnectRepositoryTest {
         val manager = FakeHealthConnectManager(
             availability = HealthConnectAvailability.UNAVAILABLE,
         )
-        val repository = DefaultHealthConnectRepository(manager, permissionGateway)
+        val repository = DefaultHealthConnectRepository(manager, permissionGateway, ZoneOffset.UTC)
 
         val status = repository.getStatus()
 
@@ -37,7 +39,7 @@ class HealthConnectRepositoryTest {
             ),
             backgroundReadFeatureAvailable = true,
         )
-        val repository = DefaultHealthConnectRepository(manager, permissionGateway)
+        val repository = DefaultHealthConnectRepository(manager, permissionGateway, ZoneOffset.UTC)
 
         val status = repository.getStatus()
 
@@ -56,11 +58,32 @@ class HealthConnectRepositoryTest {
                 weightReadings = listOf(first, latest),
             ),
             healthPermissionGateway = permissionGateway,
+            zoneId = ZoneOffset.UTC,
         )
 
         val reading = repository.readLatestWeight()
 
         assertEquals(latest, reading)
+    }
+
+    @Test
+    fun `read latest weight for date only returns a match for that day`() = runTest {
+        val today = WeightReading(79.5, Instant.parse("2026-03-03T10:15:30Z"))
+        val repository = DefaultHealthConnectRepository(
+            healthConnectManager = FakeHealthConnectManager(
+                availability = HealthConnectAvailability.AVAILABLE,
+                weightReadings = listOf(
+                    WeightReading(80.0, Instant.parse("2026-03-01T10:15:30Z")),
+                    today,
+                ),
+            ),
+            healthPermissionGateway = permissionGateway,
+            zoneId = ZoneOffset.UTC,
+        )
+
+        val reading = repository.readLatestWeightFor(LocalDate.parse("2026-03-03"))
+
+        assertEquals(today, reading)
     }
 
     private class FakeHealthConnectManager(

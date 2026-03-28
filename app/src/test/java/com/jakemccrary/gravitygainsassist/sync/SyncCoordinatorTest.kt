@@ -36,6 +36,7 @@ class SyncCoordinatorTest {
             appStateRepository = appStateRepository,
             websiteSubmissionRepository = FakeWebsiteSubmissionRepository(),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -60,6 +61,7 @@ class SyncCoordinatorTest {
             appStateRepository = FakeAppStateRepository(),
             websiteSubmissionRepository = FakeWebsiteSubmissionRepository(),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.BACKGROUND_WORK)
@@ -81,6 +83,7 @@ class SyncCoordinatorTest {
             appStateRepository = FakeAppStateRepository(),
             websiteSubmissionRepository = websiteSubmissionRepository,
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -105,6 +108,7 @@ class SyncCoordinatorTest {
             appStateRepository = appStateRepository,
             websiteSubmissionRepository = websiteSubmissionRepository,
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -135,6 +139,7 @@ class SyncCoordinatorTest {
                 result = SubmissionResult.MissingSession,
             ),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -158,6 +163,7 @@ class SyncCoordinatorTest {
                 result = SubmissionResult.AuthExpired,
             ),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -180,6 +186,7 @@ class SyncCoordinatorTest {
                 result = SubmissionResult.NetworkFailure(java.io.IOException("offline")),
             ),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
             syncFailureNotifier = FakeSyncFailureNotifier(),
         )
 
@@ -210,6 +217,7 @@ class SyncCoordinatorTest {
                 ),
             ),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
             syncFailureNotifier = notifier,
         )
 
@@ -236,6 +244,7 @@ class SyncCoordinatorTest {
             appStateRepository = FakeAppStateRepository(),
             websiteSubmissionRepository = FakeWebsiteSubmissionRepository(),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
             syncFailureNotifier = FakeSyncFailureNotifier(),
         )
 
@@ -258,6 +267,7 @@ class SyncCoordinatorTest {
                 result = SubmissionResult.NetworkFailure(java.io.IOException("offline")),
             ),
             clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
             syncFailureNotifier = notifier,
         )
 
@@ -298,6 +308,8 @@ class SyncCoordinatorTest {
             throwable?.let { throw it }
             return latestWeight
         }
+
+        override suspend fun readLatestWeightFor(date: LocalDate): WeightReading? = latestWeight
     }
 
     private class FakeWebsiteSubmissionRepository(
@@ -350,13 +362,27 @@ class SyncCoordinatorTest {
             at: Instant,
             latestWeight: WeightReading?,
             submittedWeight: SubmittedWeight,
+            preferredNextSyncMinutesOfDay: Int,
         ) {
             recordedSyncSuccesses += Triple(at, latestWeight, submittedWeight)
             backingState.value = backingState.value.copy(
                 lastWeight = latestWeight,
                 lastSyncSuccessAt = at,
                 lastSubmittedWeight = submittedWeight,
+                preferredNextSyncMinutesOfDay = preferredNextSyncMinutesOfDay,
             )
+        }
+
+        override suspend fun recordHealthConnectStatus(status: HealthConnectStatus) {
+            backingState.value = backingState.value.copy(
+                weightPermissionGranted = status.isWeightPermissionGranted,
+                backgroundReadFeatureAvailable = status.isBackgroundReadFeatureAvailable,
+                backgroundReadPermissionGranted = status.isBackgroundReadPermissionGranted,
+            )
+        }
+
+        override suspend fun recordNextAutoSyncCheck(at: Instant?) {
+            backingState.value = backingState.value.copy(nextAutoSyncCheckAt = at)
         }
     }
 

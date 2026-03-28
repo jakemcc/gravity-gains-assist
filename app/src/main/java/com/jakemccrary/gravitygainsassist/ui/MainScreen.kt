@@ -141,6 +141,7 @@ private fun MainScreenContent(
             }
 
             SyncSummaryCard(dashboardModel.syncSummary)
+            AutoSyncStatusCard(screenState)
 
             dashboardModel.statusMessage?.let { message ->
                 InlineNoteCard(message)
@@ -370,6 +371,99 @@ private fun SyncSummaryCard(summary: DashboardSyncSummary) {
 }
 
 @Composable
+private fun AutoSyncStatusCard(screenState: MainScreenState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.82f),
+        ),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = "Auto-sync status",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            AutoSyncStatusRow("Auto sync", if (screenState.autoSyncEnabled) "On" else "Off")
+            AutoSyncStatusRow(
+                "Background Health Connect",
+                when {
+                    screenState.healthStatus == null -> "Unknown"
+                    screenState.healthStatus.isBackgroundReadFeatureAvailable -> "Available"
+                    else -> "Unavailable"
+                },
+            )
+            AutoSyncStatusRow(
+                "Background permission",
+                when {
+                    screenState.healthStatus == null -> "Unknown"
+                    screenState.healthStatus.isBackgroundReadPermissionGranted -> "Granted"
+                    else -> "Not granted"
+                },
+            )
+            AutoSyncStatusRow(
+                "Today's sync",
+                screenState.todaySyncStatusText ?: "Unknown",
+            )
+            AutoSyncStatusRow(
+                "Next check",
+                screenState.nextAutoSyncCheckAt?.displayDateTime() ?: "Not scheduled",
+            )
+            AutoSyncStatusRow(
+                "Last attempt",
+                screenState.lastSyncAttemptAt?.displayDateTime() ?: "Never",
+            )
+            AutoSyncStatusRow(
+                "Last success",
+                screenState.lastSyncSuccessAt?.displayDateTime() ?: "Never",
+            )
+            AutoSyncStatusRow(
+                "Grip Gains session",
+                when (screenState.sessionState.status) {
+                    GripGainsSessionState.Status.NO_TOKEN -> "Missing"
+                    GripGainsSessionState.Status.INVALID_SESSION -> "Invalid"
+                    GripGainsSessionState.Status.TOKEN_PRESENT -> "Valid"
+                },
+            )
+            AutoSyncStatusRow(
+                "Most recent error",
+                screenState.lastSyncFailureMessage ?: screenState.lastSyncSkippedReasonText ?: "None",
+            )
+        }
+    }
+}
+
+@Composable
+private fun AutoSyncStatusRow(
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
 private fun InlineNoteCard(message: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -424,7 +518,7 @@ private fun UtilityActionsCard(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Sync automatically after reading a new weight when today has not synced yet.",
+                        text = "Keep checking in the background and stop once today's weight is synced.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

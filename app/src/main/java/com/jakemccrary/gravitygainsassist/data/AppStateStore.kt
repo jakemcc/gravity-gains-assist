@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.jakemccrary.gravitygainsassist.model.AppState
@@ -52,6 +53,11 @@ class PreferenceAppStateStore(
             },
             lastSyncAttemptAt = this[LAST_SYNC_ATTEMPT_AT_KEY]?.let(Instant::ofEpochMilli),
             lastSyncSuccessAt = this[LAST_SYNC_SUCCESS_AT_KEY]?.let(Instant::ofEpochMilli),
+            preferredNextSyncMinutesOfDay = this[PREFERRED_NEXT_SYNC_MINUTES_OF_DAY_KEY],
+            nextAutoSyncCheckAt = this[NEXT_AUTO_SYNC_CHECK_AT_KEY]?.let(Instant::ofEpochMilli),
+            weightPermissionGranted = this[WEIGHT_PERMISSION_GRANTED_KEY],
+            backgroundReadFeatureAvailable = this[BACKGROUND_READ_FEATURE_AVAILABLE_KEY],
+            backgroundReadPermissionGranted = this[BACKGROUND_READ_PERMISSION_GRANTED_KEY],
             lastSyncSkippedReason = this[LAST_SYNC_SKIPPED_REASON_KEY]?.let(SyncSkipReason::valueOf),
             lastSyncFailureMessage = this[LAST_SYNC_FAILURE_MESSAGE_KEY],
             lastSubmittedWeight = this[LAST_SUBMITTED_DATE_KEY]?.let { epochDay ->
@@ -87,6 +93,36 @@ class PreferenceAppStateStore(
             remove(LAST_SYNC_SUCCESS_AT_KEY)
         }
 
+        if (appState.preferredNextSyncMinutesOfDay != null) {
+            this[PREFERRED_NEXT_SYNC_MINUTES_OF_DAY_KEY] = appState.preferredNextSyncMinutesOfDay
+        } else {
+            remove(PREFERRED_NEXT_SYNC_MINUTES_OF_DAY_KEY)
+        }
+
+        if (appState.nextAutoSyncCheckAt != null) {
+            this[NEXT_AUTO_SYNC_CHECK_AT_KEY] = appState.nextAutoSyncCheckAt.toEpochMilli()
+        } else {
+            remove(NEXT_AUTO_SYNC_CHECK_AT_KEY)
+        }
+
+        if (appState.weightPermissionGranted != null) {
+            this[WEIGHT_PERMISSION_GRANTED_KEY] = appState.weightPermissionGranted
+        } else {
+            remove(WEIGHT_PERMISSION_GRANTED_KEY)
+        }
+
+        if (appState.backgroundReadFeatureAvailable != null) {
+            this[BACKGROUND_READ_FEATURE_AVAILABLE_KEY] = appState.backgroundReadFeatureAvailable
+        } else {
+            remove(BACKGROUND_READ_FEATURE_AVAILABLE_KEY)
+        }
+
+        if (appState.backgroundReadPermissionGranted != null) {
+            this[BACKGROUND_READ_PERMISSION_GRANTED_KEY] = appState.backgroundReadPermissionGranted
+        } else {
+            remove(BACKGROUND_READ_PERMISSION_GRANTED_KEY)
+        }
+
         if (appState.lastSyncSkippedReason != null) {
             this[LAST_SYNC_SKIPPED_REASON_KEY] = appState.lastSyncSkippedReason.name
         } else {
@@ -114,6 +150,14 @@ class PreferenceAppStateStore(
         val LAST_WEIGHT_AT_KEY = longPreferencesKey("last_weight_at")
         val LAST_SYNC_ATTEMPT_AT_KEY = longPreferencesKey("last_sync_attempt_at")
         val LAST_SYNC_SUCCESS_AT_KEY = longPreferencesKey("last_sync_success_at")
+        val PREFERRED_NEXT_SYNC_MINUTES_OF_DAY_KEY =
+            intPreferencesKey("preferred_next_sync_minutes_of_day")
+        val NEXT_AUTO_SYNC_CHECK_AT_KEY = longPreferencesKey("next_auto_sync_check_at")
+        val WEIGHT_PERMISSION_GRANTED_KEY = booleanPreferencesKey("weight_permission_granted")
+        val BACKGROUND_READ_FEATURE_AVAILABLE_KEY =
+            booleanPreferencesKey("background_read_feature_available")
+        val BACKGROUND_READ_PERMISSION_GRANTED_KEY =
+            booleanPreferencesKey("background_read_permission_granted")
         val LAST_SYNC_SKIPPED_REASON_KEY = stringPreferencesKey("last_sync_skipped_reason")
         val LAST_SYNC_FAILURE_MESSAGE_KEY = stringPreferencesKey("last_sync_failure_message")
         val LAST_SUBMITTED_DATE_KEY = longPreferencesKey("last_submitted_date")

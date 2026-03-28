@@ -8,6 +8,7 @@ import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
 import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
 import com.jakemccrary.gravitygainsassist.model.SubmittedWeight
 import com.jakemccrary.gravitygainsassist.model.WeightReading
+import com.jakemccrary.gravitygainsassist.sync.AutoSyncCoordinator
 import com.jakemccrary.gravitygainsassist.sync.SyncScheduler
 import com.jakemccrary.gravitygainsassist.website.AuthRepository
 import com.jakemccrary.gravitygainsassist.website.GripGainsSession
@@ -24,9 +25,7 @@ import kotlinx.coroutines.test.resetMain
 import org.junit.Assert.assertEquals
 import org.junit.After
 import org.junit.Test
-import java.time.Clock
 import java.time.Instant
-import java.time.ZoneOffset
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -36,9 +35,9 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `reading a weight enqueues auto sync when enabled and today has not synced`() = runTest {
+    fun `reading a weight asks the auto sync coordinator to schedule when enabled`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val scheduler = FakeSyncScheduler()
+        val autoSyncCoordinator = FakeAutoSyncCoordinator()
         val appStateRepository = FakeAppStateRepository(
             AppState(autoSyncEnabled = true),
         )
@@ -51,30 +50,21 @@ class MainViewModelTest {
             ),
             appStateRepository = appStateRepository,
             authRepository = FakeAuthRepository(),
-            syncScheduler = scheduler,
+            syncScheduler = FakeSyncScheduler(),
+            autoSyncCoordinator = autoSyncCoordinator,
             healthPermissionGateway = HealthPermissionGateway(),
-            autoSyncPolicy = AutoSyncPolicy(
-                clock = Clock.fixed(Instant.parse("2026-03-25T12:00:00Z"), ZoneOffset.UTC),
-                zoneId = ZoneOffset.UTC,
-            ),
         )
 
         viewModel.readLatestWeightNow()
         advanceUntilIdle()
 
-        assertEquals(1, scheduler.immediateSyncRequests)
+        assertEquals(1, autoSyncCoordinator.scheduleIfEnabledCalls)
     }
 
     @Test
-    fun `reading a weight does not enqueue auto sync when today already synced`() = runTest {
+    fun `toggling auto sync delegates to the coordinator`() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        val scheduler = FakeSyncScheduler()
-        val appStateRepository = FakeAppStateRepository(
-            AppState(
-                autoSyncEnabled = true,
-                lastSyncSuccessAt = Instant.parse("2026-03-25T02:00:00Z"),
-            ),
-        )
+        val autoSyncCoordinator = FakeAutoSyncCoordinator()
         val viewModel = MainViewModel(
             healthConnectRepository = FakeHealthConnectRepository(
                 latestWeight = WeightReading(
@@ -82,20 +72,17 @@ class MainViewModelTest {
                     recordedAt = Instant.parse("2026-03-25T07:00:00Z"),
                 ),
             ),
-            appStateRepository = appStateRepository,
+            appStateRepository = FakeAppStateRepository(AppState()),
             authRepository = FakeAuthRepository(),
-            syncScheduler = scheduler,
+            syncScheduler = FakeSyncScheduler(),
+            autoSyncCoordinator = autoSyncCoordinator,
             healthPermissionGateway = HealthPermissionGateway(),
-            autoSyncPolicy = AutoSyncPolicy(
-                clock = Clock.fixed(Instant.parse("2026-03-25T12:00:00Z"), ZoneOffset.UTC),
-                zoneId = ZoneOffset.UTC,
-            ),
         )
 
-        viewModel.readLatestWeightNow()
+        viewModel.setAutoSyncEnabled(true)
         advanceUntilIdle()
 
-        assertEquals(0, scheduler.immediateSyncRequests)
+        assertEquals(listOf(true), autoSyncCoordinator.setEnabledCalls)
     }
 
     private class FakeHealthConnectRepository(
@@ -111,6 +98,8 @@ class MainViewModelTest {
         }
 
         override suspend fun readLatestWeight(): WeightReading? = latestWeight
+
+        override suspend fun readLatestWeightFor(date: java.time.LocalDate): WeightReading? = latestWeight
     }
 
     private class FakeAppStateRepository(
@@ -144,12 +133,26 @@ class MainViewModelTest {
             at: Instant,
             latestWeight: WeightReading?,
             submittedWeight: SubmittedWeight,
+            preferredNextSyncMinutesOfDay: Int,
         ) {
             state.value = state.value.copy(
                 lastSyncSuccessAt = at,
                 lastWeight = latestWeight,
                 lastSubmittedWeight = submittedWeight,
+                preferredNextSyncMinutesOfDay = preferredNextSyncMinutesOfDay,
             )
+        }
+
+        override suspend fun recordHealthConnectStatus(status: HealthConnectStatus) {
+            state.value = state.value.copy(
+                weightPermissionGranted = status.isWeightPermissionGranted,
+                backgroundReadFeatureAvailable = status.isBackgroundReadFeatureAvailable,
+                backgroundReadPermissionGranted = status.isBackgroundReadPermissionGranted,
+            )
+        }
+
+        override suspend fun recordNextAutoSyncCheck(at: Instant?) {
+            state.value = state.value.copy(nextAutoSyncCheckAt = at)
         }
     }
 
@@ -178,5 +181,26 @@ class MainViewModelTest {
         override fun enqueueImmediateSync() {
             immediateSyncRequests += 1
         }
+
+        override fun replaceAutoSync(at: Instant) = Unit
+
+        override fun scheduleNextAutoSync(at: Instant) = Unit
+
+        override fun cancelAutoSync() = Unit
+    }
+
+    private class FakeAutoSyncCoordinator : AutoSyncCoordinator {
+        val setEnabledCalls = mutableListOf<Boolean>()
+        var scheduleIfEnabledCalls: Int = 0
+
+        override suspend fun setEnabled(enabled: Boolean) {
+            setEnabledCalls += enabled
+        }
+
+        override suspend fun scheduleIfEnabled() {
+            scheduleIfEnabledCalls += 1
+        }
+
+        override suspend fun runAutoSync() = Unit
     }
 }

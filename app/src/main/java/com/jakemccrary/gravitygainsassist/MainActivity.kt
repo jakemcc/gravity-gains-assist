@@ -12,10 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.health.connect.client.PermissionController
 import com.jakemccrary.gravitygainsassist.ui.MainScreen
 import com.jakemccrary.gravitygainsassist.ui.MainViewModel
-import com.jakemccrary.gravitygainsassist.ui.AutoSyncPolicy
 import com.jakemccrary.gravitygainsassist.ui.theme.GravityGainsAssistTheme
-import java.time.Clock
-import java.time.ZoneId
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels {
@@ -24,8 +21,8 @@ class MainActivity : ComponentActivity() {
             appStateRepository = appContainer.appStateRepository,
             authRepository = appContainer.authRepository,
             syncScheduler = appContainer.syncScheduler,
+            autoSyncCoordinator = appContainer.autoSyncCoordinator,
             healthPermissionGateway = appContainer.healthPermissionGateway,
-            autoSyncPolicy = AutoSyncPolicy(Clock.systemUTC(), ZoneId.systemDefault()),
         )
     }
 

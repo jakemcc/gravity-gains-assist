@@ -9,6 +9,7 @@ import com.jakemccrary.gravitygainsassist.model.SyncTrigger
 import com.jakemccrary.gravitygainsassist.website.SubmissionResult
 import com.jakemccrary.gravitygainsassist.website.WebsiteSubmissionRepository
 import java.time.Clock
+import java.time.ZoneId
 
 interface SyncCoordinator {
     suspend fun runSync(trigger: SyncTrigger): SyncOutcome
@@ -19,6 +20,7 @@ class DefaultSyncCoordinator(
     private val appStateRepository: AppStateRepository,
     private val websiteSubmissionRepository: WebsiteSubmissionRepository,
     private val clock: Clock,
+    private val zoneId: ZoneId,
     private val syncFailureNotifier: SyncFailureNotifier = NoOpSyncFailureNotifier,
 ) : SyncCoordinator {
     override suspend fun runSync(trigger: SyncTrigger): SyncOutcome {
@@ -27,6 +29,7 @@ class DefaultSyncCoordinator(
 
         return try {
             val healthStatus = healthConnectRepository.getStatus()
+            appStateRepository.recordHealthConnectStatus(healthStatus)
             when {
                 healthStatus.availability != HealthConnectAvailability.AVAILABLE -> {
                     skip(SyncSkipReason.HEALTH_CONNECT_UNAVAILABLE)
@@ -75,6 +78,7 @@ class DefaultSyncCoordinator(
                     at = clock.instant(),
                     latestWeight = latestWeight,
                     submittedWeight = submissionResult.submittedWeight,
+                    preferredNextSyncMinutesOfDay = preferredMinutesFor(clock.instant()),
                 )
                 SyncOutcome.Succeeded(latestWeight)
             }
@@ -111,5 +115,10 @@ class DefaultSyncCoordinator(
     private suspend fun recordFailure(message: String) {
         appStateRepository.recordSyncFailure(message)
         syncFailureNotifier.notifyFailure(message)
+    }
+
+    private fun preferredMinutesFor(at: java.time.Instant): Int {
+        val localTime = at.atZone(zoneId).toLocalTime()
+        return (localTime.hour * 60) + localTime.minute
     }
 }

@@ -64,12 +64,18 @@ class AppStateRepositoryTest {
             weightLbs = 178.8,
         )
 
-        repository.recordSyncSuccess(successAt, latestWeight, submittedWeight)
+        repository.recordSyncSuccess(
+            at = successAt,
+            latestWeight = latestWeight,
+            submittedWeight = submittedWeight,
+            preferredNextSyncMinutesOfDay = (4 * 60),
+        )
 
         val state = repository.appState.first()
         assertEquals(latestWeight, state.lastWeight)
         assertEquals(successAt, state.lastSyncSuccessAt)
         assertEquals(submittedWeight, state.lastSubmittedWeight)
+        assertEquals((4 * 60), state.preferredNextSyncMinutesOfDay)
     }
 
     @Test
@@ -100,6 +106,34 @@ class AppStateRepositoryTest {
         val state = repository.appState.first()
         assertEquals("Network error", state.lastSyncFailureMessage)
         assertNull(state.lastSyncSkippedReason)
+    }
+
+    @Test
+    fun `record next auto sync check updates persisted scheduling state`() = runTest {
+        val repository = DefaultAppStateRepository(FakeAppStateStore())
+        val nextCheckAt = Instant.parse("2026-03-12T11:42:00Z")
+
+        repository.recordNextAutoSyncCheck(nextCheckAt)
+
+        assertEquals(nextCheckAt, repository.appState.first().nextAutoSyncCheckAt)
+    }
+
+    @Test
+    fun `disabling auto sync clears any stored next auto sync check`() = runTest {
+        val repository = DefaultAppStateRepository(
+            FakeAppStateStore(
+                initialState = AppState(
+                    autoSyncEnabled = true,
+                    nextAutoSyncCheckAt = Instant.parse("2026-03-12T11:42:00Z"),
+                ),
+            ),
+        )
+
+        repository.setAutoSyncEnabled(false)
+
+        val state = repository.appState.first()
+        assertEquals(false, state.autoSyncEnabled)
+        assertNull(state.nextAutoSyncCheckAt)
     }
 
     private class FakeAppStateStore(
