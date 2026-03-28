@@ -94,7 +94,7 @@ class AutoSyncCoordinatorTest {
     }
 
     @Test
-    fun `weight found submits marks success and schedules tomorrow using the success time anchor`() = runTest {
+    fun `weight found submits marks success and schedules tomorrow using the weight recorded time anchor`() = runTest {
         val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
         val scheduler = FakeSyncScheduler()
         val todayWeight = WeightReading(
@@ -119,7 +119,7 @@ class AutoSyncCoordinatorTest {
         coordinator.runAutoSync()
 
         assertEquals(listOf(todayWeight), websiteSubmissionRepository.submittedWeights)
-        assertEquals((7 * 60) + 0, appStateRepository.state.value.preferredNextSyncMinutesOfDay)
+        assertEquals((7 * 60), appStateRepository.state.value.preferredNextSyncMinutesOfDay)
         assertEquals(
             listOf(Instant.parse("2026-03-28T11:30:00Z")),
             scheduler.followUpAutoSyncRequests,

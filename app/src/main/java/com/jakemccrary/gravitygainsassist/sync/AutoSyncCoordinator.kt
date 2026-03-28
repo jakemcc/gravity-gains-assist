@@ -107,11 +107,15 @@ class DefaultAutoSyncCoordinator(
 
         when (val submissionResult = websiteSubmissionRepository.submitWeight(latestWeight)) {
             is SubmissionResult.Success -> {
-                appStateRepository.recordSyncSuccess(
+            appStateRepository.recordSyncSuccess(
                     at = attemptAt,
                     latestWeight = latestWeight,
                     submittedWeight = submissionResult.submittedWeight,
-                    preferredNextSyncMinutesOfDay = preferredMinutesFor(attemptAt),
+                    preferredNextSyncMinutesOfDay = SyncPreferenceTimeSelector.preferredMinutes(
+                        latestWeight = latestWeight,
+                        syncedAt = attemptAt,
+                        zoneId = zoneId,
+                    ),
                 )
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
             }
@@ -177,11 +181,5 @@ class DefaultAutoSyncCoordinator(
             else -> null
         }
     }
-
-    private fun preferredMinutesFor(at: Instant): Int {
-        val localTime = at.atZone(zoneId).toLocalTime()
-        return (localTime.hour * 60) + localTime.minute
-    }
-
     private fun today(): LocalDate = clock.instant().atZone(zoneId).toLocalDate()
 }

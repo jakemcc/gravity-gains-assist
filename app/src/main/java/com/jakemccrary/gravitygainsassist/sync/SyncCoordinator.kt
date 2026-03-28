@@ -9,7 +9,6 @@ import com.jakemccrary.gravitygainsassist.model.SyncTrigger
 import com.jakemccrary.gravitygainsassist.website.SubmissionResult
 import com.jakemccrary.gravitygainsassist.website.WebsiteSubmissionRepository
 import java.time.Clock
-import java.time.ZoneId
 
 interface SyncCoordinator {
     suspend fun runSync(trigger: SyncTrigger): SyncOutcome
@@ -20,7 +19,7 @@ class DefaultSyncCoordinator(
     private val appStateRepository: AppStateRepository,
     private val websiteSubmissionRepository: WebsiteSubmissionRepository,
     private val clock: Clock,
-    private val zoneId: ZoneId,
+    private val zoneId: java.time.ZoneId,
     private val syncFailureNotifier: SyncFailureNotifier = NoOpSyncFailureNotifier,
 ) : SyncCoordinator {
     override suspend fun runSync(trigger: SyncTrigger): SyncOutcome {
@@ -74,11 +73,16 @@ class DefaultSyncCoordinator(
     ): SyncOutcome {
         return when (submissionResult) {
             is SubmissionResult.Success -> {
+                val successAt = clock.instant()
                 appStateRepository.recordSyncSuccess(
-                    at = clock.instant(),
+                    at = successAt,
                     latestWeight = latestWeight,
                     submittedWeight = submissionResult.submittedWeight,
-                    preferredNextSyncMinutesOfDay = preferredMinutesFor(clock.instant()),
+                    preferredNextSyncMinutesOfDay = SyncPreferenceTimeSelector.preferredMinutes(
+                        latestWeight = latestWeight,
+                        syncedAt = successAt,
+                        zoneId = zoneId,
+                    ),
                 )
                 SyncOutcome.Succeeded(latestWeight)
             }
@@ -115,10 +119,5 @@ class DefaultSyncCoordinator(
     private suspend fun recordFailure(message: String) {
         appStateRepository.recordSyncFailure(message)
         syncFailureNotifier.notifyFailure(message)
-    }
-
-    private fun preferredMinutesFor(at: java.time.Instant): Int {
-        val localTime = at.atZone(zoneId).toLocalTime()
-        return (localTime.hour * 60) + localTime.minute
     }
 }
