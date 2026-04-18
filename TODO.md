@@ -19,7 +19,7 @@
 ## Low Priority
 
 - [x] Harden the Grip Gains sign-in WebView by restricting navigation to expected Grip Gains hosts.
-- [ ] Disable unneeded WebView file/content access settings during sign-in.
+- [x] Disable unneeded WebView file/content access settings during sign-in.
 
 ## Verification Notes
 

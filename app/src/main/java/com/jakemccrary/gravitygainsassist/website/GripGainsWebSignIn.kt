@@ -2,8 +2,9 @@ package com.jakemccrary.gravitygainsassist.website
 
 import android.content.Context
 import android.webkit.CookieManager
-import android.webkit.WebResourceRequest
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.net.URI
@@ -58,8 +59,7 @@ class AndroidGripGainsLoginWebViewFactory(
         cookieManager.setAcceptCookie(true)
 
         return WebView(context).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
+            configureGripGainsLoginWebSettings(AndroidGripGainsLoginWebSettings(settings))
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
@@ -79,6 +79,65 @@ class AndroidGripGainsLoginWebViewFactory(
             }
         }
     }
+}
+
+internal interface GripGainsLoginWebSettings {
+    var javaScriptEnabled: Boolean
+    var domStorageEnabled: Boolean
+    var allowFileAccess: Boolean
+    var allowContentAccess: Boolean
+    var allowFileAccessFromFileURLs: Boolean
+    var allowUniversalAccessFromFileURLs: Boolean
+}
+
+internal fun configureGripGainsLoginWebSettings(settings: GripGainsLoginWebSettings) {
+    settings.javaScriptEnabled = true
+    settings.domStorageEnabled = true
+    settings.allowFileAccess = false
+    settings.allowContentAccess = false
+    settings.allowFileAccessFromFileURLs = false
+    settings.allowUniversalAccessFromFileURLs = false
+}
+
+@Suppress("DEPRECATION")
+private class AndroidGripGainsLoginWebSettings(
+    private val settings: WebSettings,
+) : GripGainsLoginWebSettings {
+    override var javaScriptEnabled: Boolean
+        get() = settings.javaScriptEnabled
+        set(value) {
+            settings.javaScriptEnabled = value
+        }
+
+    override var domStorageEnabled: Boolean
+        get() = settings.domStorageEnabled
+        set(value) {
+            settings.domStorageEnabled = value
+        }
+
+    override var allowFileAccess: Boolean
+        get() = settings.allowFileAccess
+        set(value) {
+            settings.allowFileAccess = value
+        }
+
+    override var allowContentAccess: Boolean
+        get() = settings.allowContentAccess
+        set(value) {
+            settings.allowContentAccess = value
+        }
+
+    override var allowFileAccessFromFileURLs: Boolean
+        get() = settings.allowFileAccessFromFileURLs
+        set(value) {
+            settings.allowFileAccessFromFileURLs = value
+        }
+
+    override var allowUniversalAccessFromFileURLs: Boolean
+        get() = settings.allowUniversalAccessFromFileURLs
+        set(value) {
+            settings.allowUniversalAccessFromFileURLs = value
+        }
 }
 
 class GripGainsWebNavigationPolicy(
