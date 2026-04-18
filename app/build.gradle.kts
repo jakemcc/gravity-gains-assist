@@ -21,10 +21,23 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("upload") {
+            storeFile = file("${System.getProperty("user.home")}/keystores/upload-keystore.jks")
+            storePassword = providers.gradleProperty("UPLOAD_KEYSTORE_PASSWORD")
+                .orElse(providers.environmentVariable("UPLOAD_KEYSTORE_PASSWORD"))
+                .orNull
+            keyAlias = "upload"
+            keyPassword = providers.gradleProperty("UPLOAD_KEY_PASSWORD")
+                .orElse(providers.environmentVariable("UPLOAD_KEY_PASSWORD"))
+                .orNull
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("upload")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
