@@ -24,6 +24,7 @@ interface AuthRepository {
 
 class DefaultAuthRepository(
     private val sessionStore: SessionStore,
+    private val cookieCleaner: GripGainsCookieCleaner = NoOpGripGainsCookieCleaner,
 ) : AuthRepository {
     private val mutableSessionState = MutableStateFlow(sessionStore.read().toSessionState())
 
@@ -78,6 +79,7 @@ class DefaultAuthRepository(
 
     override suspend fun clearSession() {
         sessionStore.clear()
+        cookieCleaner.clearCookies()
         mutableSessionState.value = GripGainsSessionState(GripGainsSessionState.Status.NO_TOKEN)
     }
 

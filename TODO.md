@@ -19,9 +19,9 @@
 
 ## Session and Privacy Handling
 
-- [ ] Clear WebView cookies when the user clears the saved sign-in.
-  - `clearGripGainsSession()` clears the encrypted app session only.
-  - Also clear the relevant `CookieManager` cookies used by the Grip Gains WebView.
+- [x] Clear WebView cookies when the user clears the saved sign-in.
+  - `clearGripGainsSession()` clears the encrypted app session.
+  - `DefaultAuthRepository.clearSession()` also clears Grip Gains cookies through `CookieManager`.
 
 - [ ] Remove health data from release logs.
   - Stop logging the submission JSON body that contains date and weight.

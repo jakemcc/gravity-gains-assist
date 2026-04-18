@@ -12,8 +12,39 @@ interface GripGainsLoginWebViewFactory {
 
 class AndroidGripGainsCookieSource(
     private val cookieManager: CookieManager = CookieManager.getInstance(),
-) : GripGainsCookieSource {
+) : GripGainsCookieSource, GripGainsCookieCleaner {
     override fun readCookieHeader(url: String): String? = cookieManager.getCookie(url)
+
+    override fun clearCookies() {
+        readCookieHeader(GripGainsUrls.baseUrl)
+            .orEmpty()
+            .split(";")
+            .mapNotNull { cookie -> cookie.cookieName() }
+            .forEach { cookieName ->
+                cookieManager.setCookie(
+                    GripGainsUrls.baseUrl,
+                    "$cookieName=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/",
+                )
+            }
+        cookieManager.flush()
+    }
+}
+
+interface GripGainsCookieCleaner {
+    fun clearCookies()
+}
+
+object NoOpGripGainsCookieCleaner : GripGainsCookieCleaner {
+    override fun clearCookies() = Unit
+}
+
+private fun String.cookieName(): String? {
+    val separatorIndex = indexOf('=')
+    if (separatorIndex <= 0) {
+        return null
+    }
+
+    return substring(0, separatorIndex).trim().ifBlank { null }
 }
 
 class AndroidGripGainsLoginWebViewFactory(

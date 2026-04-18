@@ -72,11 +72,13 @@ class AppContainer private constructor(
                 healthPermissionGateway = healthPermissionGateway,
                 zoneId = zoneId,
             )
+            val gripGainsCookieSource = AndroidGripGainsCookieSource()
             val authRepository: AuthRepository = DefaultAuthRepository(
                 sessionStore = SecurePreferencesSessionStore(applicationContext),
+                cookieCleaner = gripGainsCookieSource,
             )
             val gripGainsWebSignInSessionCapture = GripGainsWebSignInSessionCapture(
-                cookieSource = AndroidGripGainsCookieSource(),
+                cookieSource = gripGainsCookieSource,
             )
             val gripGainsLoginWebViewFactory: GripGainsLoginWebViewFactory =
                 AndroidGripGainsLoginWebViewFactory()

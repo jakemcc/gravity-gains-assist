@@ -63,6 +63,24 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun `clear session clears web sign in cookies`() = runTest {
+        val cookieCleaner = FakeGripGainsCookieCleaner()
+        val repository = DefaultAuthRepository(
+            sessionStore = FakeSessionStore(
+                StoredSessionRecord(
+                    token = "abc123",
+                    cookieHeader = "grip_gains_token=abc123",
+                ),
+            ),
+            cookieCleaner = cookieCleaner,
+        )
+
+        repository.clearSession()
+
+        assertEquals(1, cookieCleaner.clearCount)
+    }
+
+    @Test
     fun `mark session invalid keeps token but removes active session`() = runTest {
         val repository = DefaultAuthRepository(
             FakeSessionStore(
@@ -122,6 +140,15 @@ class AuthRepositoryTest {
 
         override fun clear() {
             record = StoredSessionRecord()
+        }
+    }
+
+    private class FakeGripGainsCookieCleaner : GripGainsCookieCleaner {
+        var clearCount = 0
+            private set
+
+        override fun clearCookies() {
+            clearCount += 1
         }
     }
 }
