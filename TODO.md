@@ -4,7 +4,7 @@
 
 - [x] Add a top-level `README.md` that explains what the app does, how to build it, and how to run tests.
 - [ ] Add a top-level `LICENSE` before making the repository open source.
-- [ ] Add a privacy/data-use document that states what Health Connect data is read, what is stored locally, what is sent to Grip Gains, and how users can revoke permissions or clear their saved sign-in.
+- [x] Document privacy/data-use details in `README.md`, including what Health Connect data is read, what is stored locally, what is sent to Grip Gains, and how users can revoke permissions or clear their saved sign-in.
 - [x] Document release signing prerequisites for private distribution, including required keystore location or override, key alias, and `UPLOAD_KEYSTORE_PASSWORD` / `UPLOAD_KEY_PASSWORD` configuration.
 - [ ] Decide whether release signing should fail only for release builds with a clear error message, or support a documented local signing fallback.
 

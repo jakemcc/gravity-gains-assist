@@ -25,7 +25,7 @@ Manual reads and normal syncs look for the latest weight record in the recent 24
 Automatic background sync uses today's Health Connect weight record when available.
 The app does not write data back to Health Connect.
 
-When submitting to Grip Gains, the app converts kilograms to pounds, rounds the value to one decimal place, and sends the data to `gripgains.ca`
+When submitting to Grip Gains, the app converts kilograms to pounds, rounds the value to one decimal place, and sends the data to `gripgains.ca`.
 
 The app includes the saved Grip Gains authorization token and cookie header with the request so Grip Gains can accept the submission.
 
@@ -45,6 +45,19 @@ Stored state includes:
 Grip Gains sign-in data is stored separately in private app preferences.
 The token and cookie header are encrypted with an Android Keystore-backed AES-GCM key.
 Clearing the saved Grip Gains sign-in from the app removes the stored session and clears Grip Gains cookies managed by the app.
+
+## Revoking Access
+
+Turn off auto-sync in the app to stop scheduled background checks.
+
+Use the app's clear sign-in action to remove the saved Grip Gains session and app-managed Grip Gains cookies.
+After clearing the sign-in, the app cannot submit weight data until the user signs in again.
+
+Revoke Health Connect access from Android settings.
+Open Health Connect, choose app permissions, select GravityGainsAssist, and remove access.
+After Health Connect access is revoked, the app cannot read weight records unless the user grants permission again.
+
+Clear the app's storage or uninstall the app to remove locally stored app state.
 
 ## Network and Logs
 
