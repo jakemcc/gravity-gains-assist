@@ -23,7 +23,11 @@ RELEASE_INPUTS := \
 	$(GRADLE_INPUTS) \
 	$(call rwildcard,app/src/main/,*)
 
-.PHONY: help test assemble bundle-release verify install install-release run clean
+DEBUG_INPUTS := \
+	$(GRADLE_INPUTS) \
+	$(call rwildcard,app/src/main/,*)
+
+.PHONY: help test bundle-release verify install install-release run clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "\033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -31,7 +35,9 @@ help: ## Show available targets
 test: ## Run unit tests
 	$(GRADLEW) test
 
-assemble: ## Build the debug APK
+assemble: $(DEBUG_APK) ## Build the debug APK
+
+$(DEBUG_APK): $(DEBUG_INPUTS)
 	$(GRADLEW) assembleDebug
 
 release: $(RELEASE_APK) ## Build the release APK
@@ -45,8 +51,7 @@ bundle-release: ## Build the release app bundle
 verify: ## Run the standard verification command for this project
 	$(GRADLEW) test assembleDebug
 
-install: ## Build and install the debug app; set SERIAL=<device-id> when needed
-	$(GRADLEW) assembleDebug
+install: assemble ## Build and install the debug app; set SERIAL=<device-id> when needed
 	$(ADB) $(SERIAL_ARG) install -r $(DEBUG_APK)
 
 install-release: release ## Build and install the release app; set SERIAL=<device-id> when needed
