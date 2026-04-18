@@ -1,15 +1,34 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
+/.idea/caches/
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+/.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local signing and service credentials
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.mobileprovision
+google-services.json
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Secret material
+*secret*
+*credential*

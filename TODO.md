@@ -39,10 +39,10 @@
   - If the API is private, avoid publishing this code as public open source.
   - If the API is intended for clients, document the supported integration path.
 
-- [ ] Remove tracked IDE metadata that does not belong in a public repo.
-  - Review tracked `.idea/*` files.
-  - Keep only project files that are intentionally shared.
+- [x] Remove tracked IDE metadata that does not belong in a public repo.
+  - Keep stable Android Studio project files tracked.
+  - Ignore local `.idea/` state such as caches, workspace, device target selection, and run-configuration producer preferences.
 
-- [ ] Keep generated local files and secrets out of version control.
-  - Confirm `local.properties` remains ignored.
-  - Keep keystores, `.env` files, `google-services.json`, PEM files, and private keys untracked.
+- [x] Keep generated local files and secrets out of version control.
+  - Confirmed `local.properties` remains ignored.
+  - Ignore keystores, `.env` files, `google-services.json`, PEM files, private keys, and common secret or credential filenames.
