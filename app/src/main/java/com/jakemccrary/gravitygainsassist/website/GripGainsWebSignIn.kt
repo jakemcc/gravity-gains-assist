@@ -2,9 +2,11 @@ package com.jakemccrary.gravitygainsassist.website
 
 import android.content.Context
 import android.webkit.CookieManager
+import android.webkit.WebResourceRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import java.net.URI
 
 interface GripGainsLoginWebViewFactory {
     fun create(context: Context, onPageFinished: () -> Unit): WebView
@@ -50,6 +52,7 @@ private fun String.cookieName(): String? {
 class AndroidGripGainsLoginWebViewFactory(
     private val initialUrl: String = GripGainsUrls.signInUrl,
     private val cookieManager: CookieManager = CookieManager.getInstance(),
+    private val navigationPolicy: GripGainsWebNavigationPolicy = GripGainsWebNavigationPolicy(),
 ) : GripGainsLoginWebViewFactory {
     override fun create(context: Context, onPageFinished: () -> Unit): WebView {
         cookieManager.setAcceptCookie(true)
@@ -59,12 +62,34 @@ class AndroidGripGainsLoginWebViewFactory(
             settings.domStorageEnabled = true
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                ): Boolean {
+                    return !navigationPolicy.isAllowed(request?.url?.toString())
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     onPageFinished()
                 }
             }
-            loadUrl(initialUrl)
+            if (navigationPolicy.isAllowed(initialUrl)) {
+                loadUrl(initialUrl)
+            }
         }
+    }
+}
+
+class GripGainsWebNavigationPolicy(
+    private val allowedRootHost: String = "gripgains.ca",
+) {
+    fun isAllowed(url: String?): Boolean {
+        val uri = runCatching { URI(url.orEmpty()) }.getOrNull() ?: return false
+        val scheme = uri.scheme?.lowercase() ?: return false
+        val host = uri.host?.lowercase() ?: return false
+
+        return scheme == "https" &&
+            (host == allowedRootHost || host.endsWith(".$allowedRootHost"))
     }
 }
