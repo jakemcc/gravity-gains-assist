@@ -13,9 +13,9 @@
   - Use the `upload` alias in `~/keystores/upload-keystore.jks`.
   - Read signing passwords from `UPLOAD_KEYSTORE_PASSWORD` and `UPLOAD_KEY_PASSWORD` Gradle properties or environment variables.
 
-- [ ] Decide whether to enable release minification and optimization.
-  - Review `isMinifyEnabled = false` in `app/build.gradle.kts`.
-  - Enable ProGuard/R8 if the release APK will be shared outside your own devices.
+- [x] Enable release minification and optimization.
+  - Set `isMinifyEnabled = true` for the release build.
+  - Use the default optimized Android ProGuard/R8 rules plus `app/proguard-rules.pro`.
 
 ## Session and Privacy Handling
 
