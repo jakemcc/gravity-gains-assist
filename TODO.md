@@ -2,11 +2,11 @@
 
 ## Release and Distribution Safety
 
-- [ ] Disable app data backup, or explicitly exclude sensitive app data from backup and device transfer.
-  - Review `android:allowBackup` in `app/src/main/AndroidManifest.xml`.
-  - Exclude `grip_gains_session` shared preferences.
-  - Exclude `files/datastore/app_state.preferences_pb`.
-  - Update both `app/src/main/res/xml/backup_rules.xml` and `app/src/main/res/xml/data_extraction_rules.xml`.
+- [x] Disable app data backup and device transfer.
+  - Set `android:allowBackup="false"` in `app/src/main/AndroidManifest.xml`.
+  - Exclude all app-private data in `app/src/main/res/xml/backup_rules.xml`.
+  - Exclude all cloud backup and device-transfer data in `app/src/main/res/xml/data_extraction_rules.xml`.
+  - New devices require setup again instead of restoring weight state or Grip Gains session data.
 
 - [x] Replace debug signing for release builds.
   - Removed `signingConfigs.getByName("debug")` from the `release` build type.
