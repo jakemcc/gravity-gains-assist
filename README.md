@@ -72,8 +72,8 @@ Failed responses may log a truncated response body for debugging.
 
 - Android Studio or the Android SDK command-line tools.
 - JDK 21. The Gradle daemon JVM file is configured for Java 21 toolchains.
-- Android SDK 36. The app currently uses `compileSdk` 36.1, `targetSdk` 36, and `minSdk` 36.
-- A device or emulator that supports the app's Android version requirement.
+- Android SDK 36. The app currently uses `compileSdk` 36.1, `targetSdk` 36, and `minSdk` 26.
+- A device or emulator running Android 8.0/API 26 or newer.
 - Health Connect availability on the device.
 - A Grip Gains account.
 

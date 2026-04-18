@@ -12,7 +12,7 @@
 
 - [x] Replace the Health Connect permissions rationale placeholder copy with final user-facing text.
 - [x] Make the permissions rationale explicit that the app reads weight data from Health Connect and syncs it to Grip Gains.
-- [ ] Confirm whether `minSdk = 36` is intentional. If it is, document the Android version requirement; if not, lower it to the oldest supported API level.
+- [x] Lower `minSdk` to the oldest supported API level and document the Android version requirement.
 - [x] Audit tracked IDE metadata, keep shared project-opening files, and untrack local run/deployment state.
 - [x] Update `.gitignore` so future local `.idea` run/deployment state is not committed accidentally.
 
