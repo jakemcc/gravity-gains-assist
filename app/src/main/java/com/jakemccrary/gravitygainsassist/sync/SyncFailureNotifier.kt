@@ -1,6 +1,6 @@
 package com.jakemccrary.gravitygainsassist.sync
 
-import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.jakemccrary.gravitygainsassist.NotificationPermissionPolicy
 import com.jakemccrary.gravitygainsassist.R
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -32,17 +33,7 @@ class AndroidSyncFailureNotifier(
             return
         }
 
-        notificationManager.notify(
-            nextNotificationId(),
-            NotificationCompat.Builder(appContext, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.stat_notify_error)
-                .setContentTitle(appContext.getString(R.string.sync_failure_notification_title))
-                .setContentText(message)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build(),
-        )
+        notifyIfAllowed(message)
     }
 
     private fun ensureChannel() {
@@ -69,10 +60,36 @@ class AndroidSyncFailureNotifier(
     }
 
     private fun notificationsAllowed(): Boolean {
+        return NotificationPermissionPolicy.canPostNotifications(
+            sdkInt = Build.VERSION.SDK_INT,
+            permissionGranted = hasPostNotificationsPermission(),
+        )
+    }
+
+    private fun hasPostNotificationsPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             appContext,
-            Manifest.permission.POST_NOTIFICATIONS,
+            NotificationPermissionPolicy.POST_NOTIFICATIONS_PERMISSION,
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun notifyIfAllowed(message: String) {
+        try {
+            notificationManager.notify(
+                nextNotificationId(),
+                NotificationCompat.Builder(appContext, CHANNEL_ID)
+                    .setSmallIcon(android.R.drawable.stat_notify_error)
+                    .setContentTitle(appContext.getString(R.string.sync_failure_notification_title))
+                    .setContentText(message)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setAutoCancel(true)
+                    .build(),
+            )
+        } catch (_: SecurityException) {
+            return
+        }
     }
 
     private fun nextNotificationId(): Int = notificationIds.incrementAndGet()

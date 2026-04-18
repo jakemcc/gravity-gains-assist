@@ -1,7 +1,7 @@
 package com.jakemccrary.gravitygainsassist
 
-import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -52,8 +52,10 @@ class MainActivity : ComponentActivity() {
                         permissionLauncher.launch(viewModel.permissionsToRequest())
                     },
                     onSetAutoSyncEnabled = { enabled ->
-                        if (enabled && !hasNotificationPermission()) {
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        if (enabled && shouldRequestNotificationPermission()) {
+                            notificationPermissionLauncher.launch(
+                                NotificationPermissionPolicy.POST_NOTIFICATIONS_PERMISSION,
+                            )
                         }
                         viewModel.setAutoSyncEnabled(enabled)
                     },
@@ -67,10 +69,17 @@ class MainActivity : ComponentActivity() {
         viewModel.refresh()
     }
 
-    private fun hasNotificationPermission(): Boolean {
+    private fun shouldRequestNotificationPermission(): Boolean {
+        return NotificationPermissionPolicy.shouldRequestPostNotifications(
+            sdkInt = Build.VERSION.SDK_INT,
+            permissionGranted = hasPostNotificationsPermission(),
+        )
+    }
+
+    private fun hasPostNotificationsPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
-            Manifest.permission.POST_NOTIFICATIONS,
+            NotificationPermissionPolicy.POST_NOTIFICATIONS_PERMISSION,
         ) == PackageManager.PERMISSION_GRANTED
     }
 }
