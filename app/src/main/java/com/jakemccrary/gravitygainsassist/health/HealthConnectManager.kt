@@ -18,7 +18,7 @@ interface HealthConnectManager {
 
     suspend fun isBackgroundReadFeatureAvailable(): Boolean
 
-    suspend fun readWeightRecords(): List<WeightReading>
+    suspend fun readWeightRecords(startTime: Instant): List<WeightReading>
 }
 
 class AndroidHealthConnectManager(
@@ -49,11 +49,11 @@ class AndroidHealthConnectManager(
         ) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
     }
 
-    override suspend fun readWeightRecords(): List<WeightReading> {
+    override suspend fun readWeightRecords(startTime: Instant): List<WeightReading> {
         val response = client.readRecords(
             ReadRecordsRequest(
                 recordType = WeightRecord::class,
-                timeRangeFilter = TimeRangeFilter.between(Instant.EPOCH, clock.instant()),
+                timeRangeFilter = TimeRangeFilter.between(startTime, clock.instant()),
             ),
         )
 

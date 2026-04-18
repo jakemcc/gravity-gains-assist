@@ -23,18 +23,18 @@
   - `clearGripGainsSession()` clears the encrypted app session.
   - `DefaultAuthRepository.clearSession()` also clears Grip Gains cookies through `CookieManager`.
 
-- [ ] Remove health data from release logs.
+- [x] Remove health data from release logs. - Don't care about this
   - Stop logging the submission JSON body that contains date and weight.
   - Stop logging server response bodies unless the build is debug-only.
   - Keep auth header and cookie values out of logs.
 
-- [ ] Narrow Health Connect reads if possible.
-  - The current query reads weight records from `Instant.EPOCH` through now.
-  - Prefer a smaller time window if the app only needs the latest or today's weight.
+- [x] Narrow Health Connect reads.
+  - Query only the last 24 hours of weight records.
+  - Keep the existing current-day filter before auto-sync submission.
 
 ## Open Source Readiness
 
-- [ ] Decide whether the Grip Gains API contract should be public.
+- [x] Decide whether the Grip Gains API contract should be public. -- Its ok
   - The repo exposes the production endpoint, auth header format, cookie name, origin, and referer.
   - If the API is private, avoid publishing this code as public open source.
   - If the API is intended for clients, document the supported integration path.

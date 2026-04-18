@@ -7,6 +7,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -67,6 +69,25 @@ class HealthConnectRepositoryTest {
     }
 
     @Test
+    fun `read latest weight only requests recent records`() = runTest {
+        val now = Instant.parse("2026-03-03T10:15:30Z")
+        val manager = FakeHealthConnectManager(
+            availability = HealthConnectAvailability.AVAILABLE,
+            weightReadings = listOf(WeightReading(79.5, now)),
+        )
+        val repository = DefaultHealthConnectRepository(
+            healthConnectManager = manager,
+            healthPermissionGateway = permissionGateway,
+            zoneId = ZoneOffset.UTC,
+            clock = Clock.fixed(now, ZoneOffset.UTC),
+        )
+
+        repository.readLatestWeight()
+
+        assertEquals(now.minus(Duration.ofHours(24)), manager.lastWeightReadStartTime)
+    }
+
+    @Test
     fun `read latest weight for date only returns a match for that day`() = runTest {
         val today = WeightReading(79.5, Instant.parse("2026-03-03T10:15:30Z"))
         val repository = DefaultHealthConnectRepository(
@@ -105,6 +126,12 @@ class HealthConnectRepositoryTest {
             return backgroundReadFeatureAvailable
         }
 
-        override suspend fun readWeightRecords(): List<WeightReading> = weightReadings
+        var lastWeightReadStartTime: Instant? = null
+            private set
+
+        override suspend fun readWeightRecords(startTime: Instant): List<WeightReading> {
+            lastWeightReadStartTime = startTime
+            return weightReadings
+        }
     }
 }

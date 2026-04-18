@@ -3,6 +3,8 @@ package com.jakemccrary.gravitygainsassist.health
 import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
 import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
 import com.jakemccrary.gravitygainsassist.model.WeightReading
+import java.time.Clock
+import java.time.Duration
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -18,6 +20,8 @@ class DefaultHealthConnectRepository(
     private val healthConnectManager: HealthConnectManager,
     private val healthPermissionGateway: HealthPermissionGateway,
     private val zoneId: ZoneId,
+    private val clock: Clock = Clock.systemUTC(),
+    private val recentWeightLookback: Duration = Duration.ofHours(24),
 ) : HealthConnectRepository {
     override suspend fun getStatus(): HealthConnectStatus {
         val availability = healthConnectManager.getAvailability()
@@ -45,7 +49,9 @@ class DefaultHealthConnectRepository(
     }
 
     override suspend fun readLatestWeight(): WeightReading? {
-        return LatestWeightSelector.select(healthConnectManager.readWeightRecords())
+        return LatestWeightSelector.select(
+            healthConnectManager.readWeightRecords(clock.instant().minus(recentWeightLookback)),
+        )
     }
 
     override suspend fun readLatestWeightFor(date: LocalDate): WeightReading? {
