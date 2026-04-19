@@ -3,6 +3,7 @@ package com.jakemccrary.gravitygainsassist.sync
 import com.jakemccrary.gravitygainsassist.data.AppStateRepository
 import com.jakemccrary.gravitygainsassist.health.HealthConnectRepository
 import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
+import com.jakemccrary.gravitygainsassist.model.SyncFailureKind
 import com.jakemccrary.gravitygainsassist.model.SyncOutcome
 import com.jakemccrary.gravitygainsassist.model.SyncSkipReason
 import com.jakemccrary.gravitygainsassist.model.SyncTrigger
@@ -52,13 +53,17 @@ class DefaultSyncCoordinator(
                         handleSubmissionResult(
                             latestWeight = latestWeight,
                             submissionResult = websiteSubmissionRepository.submitWeight(latestWeight),
+                            trigger = trigger,
                         )
                     }
                 }
             }
         } catch (throwable: Throwable) {
             recordFailure("Unexpected sync failure.")
-            SyncOutcome.Failed(throwable)
+            SyncOutcome.Failed(
+                cause = throwable,
+                kind = SyncFailureKind.UNKNOWN,
+            )
         }
     }
 
@@ -70,6 +75,7 @@ class DefaultSyncCoordinator(
     private suspend fun handleSubmissionResult(
         latestWeight: com.jakemccrary.gravitygainsassist.model.WeightReading,
         submissionResult: SubmissionResult,
+        trigger: SyncTrigger,
     ): SyncOutcome {
         return when (submissionResult) {
             is SubmissionResult.Success -> {
@@ -84,6 +90,7 @@ class DefaultSyncCoordinator(
                         zoneId = zoneId,
                     ),
                 )
+                syncFailureNotifier.notifySuccess(SYNC_SUCCESS_MESSAGE)
                 SyncOutcome.Succeeded(latestWeight)
             }
 
@@ -93,8 +100,16 @@ class DefaultSyncCoordinator(
             SubmissionResult.AuthExpired -> skip(SyncSkipReason.INVALID_SESSION)
 
             is SubmissionResult.NetworkFailure -> {
-                recordFailure("Network error while submitting to Grip Gains.")
-                SyncOutcome.Failed(submissionResult.cause)
+                val failureMessage = if (trigger == SyncTrigger.NETWORK_RETRY) {
+                    NETWORK_RETRY_FAILED_MESSAGE
+                } else {
+                    NETWORK_RETRY_SCHEDULED_MESSAGE
+                }
+                recordFailure(failureMessage)
+                SyncOutcome.Failed(
+                    cause = submissionResult.cause,
+                    kind = SyncFailureKind.NETWORK,
+                )
             }
 
             is SubmissionResult.ServerFailure -> {
@@ -103,15 +118,17 @@ class DefaultSyncCoordinator(
                 } ?: "Grip Gains rejected the submission with HTTP ${submissionResult.statusCode}."
                 recordFailure(failureMessage)
                 SyncOutcome.Failed(
-                    IllegalStateException(
-                        failureMessage,
-                    ),
+                    cause = IllegalStateException(failureMessage),
+                    kind = SyncFailureKind.SERVER,
                 )
             }
 
             is SubmissionResult.UnknownFailure -> {
                 recordFailure("Unexpected failure while submitting to Grip Gains.")
-                SyncOutcome.Failed(submissionResult.cause)
+                SyncOutcome.Failed(
+                    cause = submissionResult.cause,
+                    kind = SyncFailureKind.UNKNOWN,
+                )
             }
         }
     }
@@ -119,5 +136,13 @@ class DefaultSyncCoordinator(
     private suspend fun recordFailure(message: String) {
         appStateRepository.recordSyncFailure(message)
         syncFailureNotifier.notifyFailure(message)
+    }
+
+    private companion object {
+        const val NETWORK_RETRY_SCHEDULED_MESSAGE =
+            "Network error while submitting to Grip Gains. Retrying once in 2 minutes."
+        const val NETWORK_RETRY_FAILED_MESSAGE =
+            "Network error while submitting to Grip Gains. Use Run sync now to try again."
+        const val SYNC_SUCCESS_MESSAGE = "Synced weight to Grip Gains."
     }
 }

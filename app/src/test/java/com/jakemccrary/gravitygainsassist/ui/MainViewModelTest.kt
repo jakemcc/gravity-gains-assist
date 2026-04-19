@@ -182,9 +182,13 @@ class MainViewModelTest {
             immediateSyncRequests += 1
         }
 
+        override fun scheduleNetworkRetry(delay: java.time.Duration) = Unit
+
         override fun replaceAutoSync(at: Instant) = Unit
 
         override fun scheduleNextAutoSync(at: Instant) = Unit
+
+        override fun scheduleNetworkRetryAutoSync(at: Instant) = Unit
 
         override fun cancelAutoSync() = Unit
     }

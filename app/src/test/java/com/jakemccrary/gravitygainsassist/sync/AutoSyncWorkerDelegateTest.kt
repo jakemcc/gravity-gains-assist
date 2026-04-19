@@ -24,7 +24,7 @@ class AutoSyncWorkerDelegateTest {
     }
 
     @Test
-    fun `unexpected auto sync failure maps to worker retry`() = runTest {
+    fun `unexpected auto sync failure maps to worker success so it does not retry immediately`() = runTest {
         val delegate = AutoSyncWorkerDelegate(
             autoSyncCoordinator = object : AutoSyncCoordinator {
                 override suspend fun setEnabled(enabled: Boolean) = Unit
@@ -39,6 +39,6 @@ class AutoSyncWorkerDelegateTest {
 
         val result = delegate.run()
 
-        assertTrue(result is ListenableWorker.Result.Retry)
+        assertTrue(result is ListenableWorker.Result.Success)
     }
 }

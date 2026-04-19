@@ -5,6 +5,7 @@ import com.jakemccrary.gravitygainsassist.model.AppState
 import com.jakemccrary.gravitygainsassist.model.HealthConnectAvailability
 import com.jakemccrary.gravitygainsassist.model.HealthConnectStatus
 import com.jakemccrary.gravitygainsassist.model.SubmittedWeight
+import com.jakemccrary.gravitygainsassist.model.SyncFailureKind
 import com.jakemccrary.gravitygainsassist.model.SyncOutcome
 import com.jakemccrary.gravitygainsassist.model.SyncSkipReason
 import com.jakemccrary.gravitygainsassist.model.SyncTrigger
@@ -96,10 +97,11 @@ class SyncCoordinatorTest {
     }
 
     @Test
-    fun `successful sync submits weight and stores success state`() = runTest {
+    fun `successful sync submits weight stores success state and notifies`() = runTest {
         val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
         val appStateRepository = FakeAppStateRepository()
         val websiteSubmissionRepository = FakeWebsiteSubmissionRepository()
+        val notifier = FakeSyncFailureNotifier()
         val coordinator = DefaultSyncCoordinator(
             healthConnectRepository = FakeHealthConnectRepository(
                 status = availableStatus(),
@@ -109,6 +111,7 @@ class SyncCoordinatorTest {
             websiteSubmissionRepository = websiteSubmissionRepository,
             clock = fixedClock,
             zoneId = ZoneOffset.UTC,
+            syncFailureNotifier = notifier,
         )
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
@@ -123,6 +126,7 @@ class SyncCoordinatorTest {
             SubmittedWeight(LocalDate.parse("2026-03-22"), 175.0),
             appStateRepository.recordedSyncSuccesses.single().third,
         )
+        assertEquals(listOf("Synced weight to Grip Gains."), notifier.successMessages)
     }
 
     @Test
@@ -173,7 +177,7 @@ class SyncCoordinatorTest {
     }
 
     @Test
-    fun `network failures surface as failed outcomes and store failure message`() = runTest {
+    fun `first network failures surface as network failed outcomes and schedule one retry message`() = runTest {
         val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
         val appStateRepository = FakeAppStateRepository()
         val coordinator = DefaultSyncCoordinator(
@@ -192,10 +196,42 @@ class SyncCoordinatorTest {
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
 
-        assertTrue(outcome is SyncOutcome.Failed)
+        assertEquals(SyncFailureKind.NETWORK, (outcome as SyncOutcome.Failed).kind)
         assertEquals(
-            "Network error while submitting to Grip Gains.",
+            "Network error while submitting to Grip Gains. Retrying once in 2 minutes.",
             appStateRepository.lastFailureMessage,
+        )
+    }
+
+    @Test
+    fun `retry network failures tell the user to retry manually`() = runTest {
+        val latestWeight = WeightReading(79.4, Instant.parse("2026-03-22T07:00:00Z"))
+        val appStateRepository = FakeAppStateRepository()
+        val notifier = FakeSyncFailureNotifier()
+        val coordinator = DefaultSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                status = availableStatus(),
+                latestWeight = latestWeight,
+            ),
+            appStateRepository = appStateRepository,
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                result = SubmissionResult.NetworkFailure(java.io.IOException("offline")),
+            ),
+            clock = fixedClock,
+            zoneId = ZoneOffset.UTC,
+            syncFailureNotifier = notifier,
+        )
+
+        val outcome = coordinator.runSync(SyncTrigger.NETWORK_RETRY)
+
+        assertEquals(SyncFailureKind.NETWORK, (outcome as SyncOutcome.Failed).kind)
+        assertEquals(
+            "Network error while submitting to Grip Gains. Use Run sync now to try again.",
+            appStateRepository.lastFailureMessage,
+        )
+        assertEquals(
+            listOf("Network error while submitting to Grip Gains. Use Run sync now to try again."),
+            notifier.messages,
         )
     }
 
@@ -223,7 +259,7 @@ class SyncCoordinatorTest {
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
 
-        assertTrue(outcome is SyncOutcome.Failed)
+        assertEquals(SyncFailureKind.SERVER, (outcome as SyncOutcome.Failed).kind)
         assertEquals(
             "Grip Gains rejected the submission: A bodyweight entry already exists for this date",
             appStateRepository.lastFailureMessage,
@@ -250,7 +286,7 @@ class SyncCoordinatorTest {
 
         val outcome = coordinator.runSync(SyncTrigger.MANUAL)
 
-        assertTrue(outcome is SyncOutcome.Failed)
+        assertEquals(SyncFailureKind.UNKNOWN, (outcome as SyncOutcome.Failed).kind)
     }
 
     @Test
@@ -273,7 +309,10 @@ class SyncCoordinatorTest {
 
         coordinator.runSync(SyncTrigger.MANUAL)
 
-        assertEquals(listOf("Network error while submitting to Grip Gains."), notifier.messages)
+        assertEquals(
+            listOf("Network error while submitting to Grip Gains. Retrying once in 2 minutes."),
+            notifier.messages,
+        )
     }
 
     private fun availableStatus(
@@ -388,9 +427,14 @@ class SyncCoordinatorTest {
 
     private class FakeSyncFailureNotifier : SyncFailureNotifier {
         val messages = mutableListOf<String>()
+        val successMessages = mutableListOf<String>()
 
         override fun notifyFailure(message: String) {
             messages += message
+        }
+
+        override fun notifySuccess(message: String) {
+            successMessages += message
         }
     }
 }

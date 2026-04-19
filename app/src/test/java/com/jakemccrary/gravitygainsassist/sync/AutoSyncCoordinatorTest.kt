@@ -97,6 +97,7 @@ class AutoSyncCoordinatorTest {
     fun `weight found submits marks success and schedules tomorrow using the weight recorded time anchor`() = runTest {
         val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
         val scheduler = FakeSyncScheduler()
+        val notifier = FakeSyncFailureNotifier()
         val todayWeight = WeightReading(
             kilograms = 82.4,
             recordedAt = Instant.parse("2026-03-27T12:00:00Z"),
@@ -114,6 +115,7 @@ class AutoSyncCoordinatorTest {
             autoSyncPlanner = AutoSyncPlanner(fixedClock, zoneId),
             clock = fixedClock,
             zoneId = zoneId,
+            syncFailureNotifier = notifier,
         )
 
         coordinator.runAutoSync()
@@ -125,6 +127,7 @@ class AutoSyncCoordinatorTest {
             scheduler.followUpAutoSyncRequests,
         )
         assertEquals(LocalDate.parse("2026-03-27"), appStateRepository.state.value.lastSubmittedWeight?.date)
+        assertEquals(listOf("Synced weight to Grip Gains."), notifier.successMessages)
     }
 
     @Test
@@ -148,6 +151,108 @@ class AutoSyncCoordinatorTest {
         assertEquals(SyncSkipReason.MISSING_SESSION, appStateRepository.lastSkippedReason)
         assertEquals(0, healthConnectRepository.readTodayWeightCalls)
         assertEquals(listOf(Instant.parse("2026-03-28T12:00:00Z")), scheduler.followUpAutoSyncRequests)
+    }
+
+    @Test
+    fun `network submission failure records the issue and schedules one retry`() = runTest {
+        val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
+        val scheduler = FakeSyncScheduler()
+        val coordinator = DefaultAutoSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                healthStatus = availableHealthStatus,
+                todayWeight = WeightReading(
+                    kilograms = 82.4,
+                    recordedAt = Instant.parse("2026-03-27T12:00:00Z"),
+                ),
+            ),
+            appStateRepository = appStateRepository,
+            authRepository = FakeAuthRepository(GripGainsSessionState.Status.TOKEN_PRESENT),
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                SubmissionResult.NetworkFailure(java.io.IOException("offline")),
+            ),
+            syncScheduler = scheduler,
+            autoSyncPlanner = AutoSyncPlanner(fixedClock, zoneId),
+            clock = fixedClock,
+            zoneId = zoneId,
+        )
+
+        coordinator.runAutoSync()
+
+        assertEquals(
+            "Network error while submitting to Grip Gains. Retrying once in 2 minutes.",
+            appStateRepository.lastFailureMessage,
+        )
+        assertEquals(listOf(Instant.parse("2026-03-27T12:02:00Z")), scheduler.networkRetryAutoSyncRequests)
+        assertTrue(scheduler.followUpAutoSyncRequests.isEmpty())
+    }
+
+    @Test
+    fun `network retry failure records manual retry message and waits until tomorrow`() = runTest {
+        val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
+        val scheduler = FakeSyncScheduler()
+        val coordinator = DefaultAutoSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                healthStatus = availableHealthStatus,
+                todayWeight = WeightReading(
+                    kilograms = 82.4,
+                    recordedAt = Instant.parse("2026-03-27T12:00:00Z"),
+                ),
+            ),
+            appStateRepository = appStateRepository,
+            authRepository = FakeAuthRepository(GripGainsSessionState.Status.TOKEN_PRESENT),
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                SubmissionResult.NetworkFailure(java.io.IOException("offline")),
+            ),
+            syncScheduler = scheduler,
+            autoSyncPlanner = AutoSyncPlanner(fixedClock, zoneId),
+            clock = fixedClock,
+            zoneId = zoneId,
+        )
+
+        coordinator.runAutoSync(isNetworkRetry = true)
+
+        assertEquals(
+            "Network error while submitting to Grip Gains. Use Run sync now to try again.",
+            appStateRepository.lastFailureMessage,
+        )
+        assertEquals(listOf(Instant.parse("2026-03-28T12:00:00Z")), scheduler.followUpAutoSyncRequests)
+        assertTrue(scheduler.networkRetryAutoSyncRequests.isEmpty())
+    }
+
+    @Test
+    fun `server submission failure records the issue and waits until tomorrow`() = runTest {
+        val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
+        val scheduler = FakeSyncScheduler()
+        val coordinator = DefaultAutoSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(
+                healthStatus = availableHealthStatus,
+                todayWeight = WeightReading(
+                    kilograms = 82.4,
+                    recordedAt = Instant.parse("2026-03-27T12:00:00Z"),
+                ),
+            ),
+            appStateRepository = appStateRepository,
+            authRepository = FakeAuthRepository(GripGainsSessionState.Status.TOKEN_PRESENT),
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(
+                SubmissionResult.ServerFailure(
+                    statusCode = 400,
+                    responseMessage = "A bodyweight entry already exists for this date",
+                ),
+            ),
+            syncScheduler = scheduler,
+            autoSyncPlanner = AutoSyncPlanner(fixedClock, zoneId),
+            clock = fixedClock,
+            zoneId = zoneId,
+        )
+
+        coordinator.runAutoSync()
+
+        assertEquals(
+            "Grip Gains rejected the submission: A bodyweight entry already exists for this date",
+            appStateRepository.lastFailureMessage,
+        )
+        assertEquals(listOf(Instant.parse("2026-03-28T12:00:00Z")), scheduler.followUpAutoSyncRequests)
+        assertTrue(scheduler.networkRetryAutoSyncRequests.isEmpty())
     }
 
     @Test
@@ -199,6 +304,7 @@ class AutoSyncCoordinatorTest {
         val state = MutableStateFlow(initialState)
         val recordedSyncSuccesses = mutableListOf<Triple<Instant, WeightReading?, SubmittedWeight>>()
         var lastSkippedReason: SyncSkipReason? = null
+        var lastFailureMessage: String? = null
 
         override val appState: Flow<AppState> = state
 
@@ -223,6 +329,7 @@ class AutoSyncCoordinatorTest {
         }
 
         override suspend fun recordSyncFailure(message: String) {
+            lastFailureMessage = message
             state.value = state.value.copy(lastSyncFailureMessage = message)
         }
 
@@ -291,9 +398,12 @@ class AutoSyncCoordinatorTest {
 
     private class FakeSyncScheduler : SyncScheduler {
         val followUpAutoSyncRequests = mutableListOf<Instant>()
+        val networkRetryAutoSyncRequests = mutableListOf<Instant>()
         var cancelAutoSyncCalls: Int = 0
 
         override fun enqueueImmediateSync() = Unit
+
+        override fun scheduleNetworkRetry(delay: java.time.Duration) = Unit
 
         override fun replaceAutoSync(at: Instant) = Unit
 
@@ -301,8 +411,22 @@ class AutoSyncCoordinatorTest {
             followUpAutoSyncRequests += at
         }
 
+        override fun scheduleNetworkRetryAutoSync(at: Instant) {
+            networkRetryAutoSyncRequests += at
+        }
+
         override fun cancelAutoSync() {
             cancelAutoSyncCalls += 1
+        }
+    }
+
+    private class FakeSyncFailureNotifier : SyncFailureNotifier {
+        val successMessages = mutableListOf<String>()
+
+        override fun notifyFailure(message: String) = Unit
+
+        override fun notifySuccess(message: String) {
+            successMessages += message
         }
     }
 }

@@ -7,6 +7,12 @@ sealed interface SyncOutcome {
 
     data class Failed(
         val cause: Throwable,
-        val isRetryable: Boolean = true,
+        val kind: SyncFailureKind = SyncFailureKind.UNKNOWN,
     ) : SyncOutcome
+}
+
+enum class SyncFailureKind {
+    NETWORK,
+    SERVER,
+    UNKNOWN,
 }

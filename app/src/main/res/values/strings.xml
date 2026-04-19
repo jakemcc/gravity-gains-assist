@@ -4,6 +4,7 @@
     <string name="health_permissions_rationale_body">Gravity Gains Assist reads your weight from Health Connect so it can sync your latest body weight to Grip Gains. If you turn on auto-sync, the app may check Health Connect in the background and stop after today\'s weight has synced. You can turn off auto-sync, clear your saved Grip Gains sign-in, or revoke Health Connect access at any time.</string>
     <string name="close">Close</string>
     <string name="sync_failure_notification_title">Gravity Gains sync failed</string>
+    <string name="sync_success_notification_title">Gravity Gains sync complete</string>
     <string name="sync_failure_notification_channel_name">Sync failures</string>
     <string name="sync_failure_notification_channel_description">Notifications for automatic sync failures.</string>
 </resources>

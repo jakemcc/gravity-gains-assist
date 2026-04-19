@@ -18,10 +18,14 @@ import java.util.concurrent.atomic.AtomicInteger
 
 interface SyncFailureNotifier {
     fun notifyFailure(message: String)
+
+    fun notifySuccess(message: String)
 }
 
 object NoOpSyncFailureNotifier : SyncFailureNotifier {
     override fun notifyFailure(message: String) = Unit
+
+    override fun notifySuccess(message: String) = Unit
 }
 
 class AndroidSyncFailureNotifier(
@@ -36,7 +40,24 @@ class AndroidSyncFailureNotifier(
             return
         }
 
-        notifyIfAllowed(message)
+        notifyIfAllowed(
+            title = appContext.getString(R.string.sync_failure_notification_title),
+            message = message,
+            icon = android.R.drawable.stat_notify_error,
+        )
+    }
+
+    override fun notifySuccess(message: String) {
+        ensureChannel()
+        if (!notificationsAllowed()) {
+            return
+        }
+
+        notifyIfAllowed(
+            title = appContext.getString(R.string.sync_success_notification_title),
+            message = message,
+            icon = android.R.drawable.stat_sys_upload_done,
+        )
     }
 
     private fun ensureChannel() {
@@ -77,13 +98,17 @@ class AndroidSyncFailureNotifier(
     }
 
     @SuppressLint("MissingPermission")
-    private fun notifyIfAllowed(message: String) {
+    private fun notifyIfAllowed(
+        title: String,
+        message: String,
+        icon: Int,
+    ) {
         try {
             notificationManager.notify(
                 nextNotificationId(),
                 NotificationCompat.Builder(appContext, CHANNEL_ID)
-                    .setSmallIcon(android.R.drawable.stat_notify_error)
-                    .setContentTitle(appContext.getString(R.string.sync_failure_notification_title))
+                    .setSmallIcon(icon)
+                    .setContentTitle(title)
                     .setContentText(message)
                     .setStyle(NotificationCompat.BigTextStyle().bigText(message))
                     .setContentIntent(contentIntent())

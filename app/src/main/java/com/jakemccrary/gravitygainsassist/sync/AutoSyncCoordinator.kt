@@ -23,6 +23,10 @@ interface AutoSyncCoordinator {
     suspend fun scheduleIfEnabled()
 
     suspend fun runAutoSync()
+
+    suspend fun runAutoSync(isNetworkRetry: Boolean) {
+        runAutoSync()
+    }
 }
 
 class DefaultAutoSyncCoordinator(
@@ -57,6 +61,10 @@ class DefaultAutoSyncCoordinator(
     }
 
     override suspend fun runAutoSync() {
+        runAutoSync(isNetworkRetry = false)
+    }
+
+    override suspend fun runAutoSync(isNetworkRetry: Boolean) {
         val appState = appStateRepository.appState.first()
         if (!appState.autoSyncEnabled) {
             appStateRepository.recordNextAutoSyncCheck(null)
@@ -107,7 +115,7 @@ class DefaultAutoSyncCoordinator(
 
         when (val submissionResult = websiteSubmissionRepository.submitWeight(latestWeight)) {
             is SubmissionResult.Success -> {
-            appStateRepository.recordSyncSuccess(
+                appStateRepository.recordSyncSuccess(
                     at = attemptAt,
                     latestWeight = latestWeight,
                     submittedWeight = submissionResult.submittedWeight,
@@ -117,6 +125,7 @@ class DefaultAutoSyncCoordinator(
                         zoneId = zoneId,
                     ),
                 )
+                syncFailureNotifier.notifySuccess(SYNC_SUCCESS_MESSAGE)
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
             }
 
@@ -132,8 +141,13 @@ class DefaultAutoSyncCoordinator(
             }
 
             is SubmissionResult.NetworkFailure -> {
-                recordFailure("Network error while submitting to Grip Gains.")
-                scheduleFollowUp(autoSyncPlanner.nextCheckAfterMiss(appStateRepository.appState.first()))
+                if (isNetworkRetry) {
+                    recordFailure(NETWORK_RETRY_FAILED_MESSAGE)
+                    scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
+                } else {
+                    recordFailure(NETWORK_RETRY_SCHEDULED_MESSAGE)
+                    scheduleNetworkRetry(clock.instant().plus(NETWORK_RETRY_DELAY))
+                }
             }
 
             is SubmissionResult.ServerFailure -> {
@@ -146,7 +160,7 @@ class DefaultAutoSyncCoordinator(
 
             is SubmissionResult.UnknownFailure -> {
                 recordFailure("Unexpected failure while submitting to Grip Gains.")
-                scheduleFollowUp(autoSyncPlanner.nextCheckAfterMiss(appStateRepository.appState.first()))
+                scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
             }
         }
     }
@@ -159,6 +173,11 @@ class DefaultAutoSyncCoordinator(
 
     private suspend fun scheduleFollowUp(nextCheckAt: Instant) {
         syncScheduler.scheduleNextAutoSync(nextCheckAt)
+        appStateRepository.recordNextAutoSyncCheck(nextCheckAt)
+    }
+
+    private suspend fun scheduleNetworkRetry(nextCheckAt: Instant) {
+        syncScheduler.scheduleNetworkRetryAutoSync(nextCheckAt)
         appStateRepository.recordNextAutoSyncCheck(nextCheckAt)
     }
 
@@ -182,4 +201,13 @@ class DefaultAutoSyncCoordinator(
         }
     }
     private fun today(): LocalDate = clock.instant().atZone(zoneId).toLocalDate()
+
+    private companion object {
+        val NETWORK_RETRY_DELAY: java.time.Duration = java.time.Duration.ofMinutes(2)
+        const val NETWORK_RETRY_SCHEDULED_MESSAGE =
+            "Network error while submitting to Grip Gains. Retrying once in 2 minutes."
+        const val NETWORK_RETRY_FAILED_MESSAGE =
+            "Network error while submitting to Grip Gains. Use Run sync now to try again."
+        const val SYNC_SUCCESS_MESSAGE = "Synced weight to Grip Gains."
+    }
 }

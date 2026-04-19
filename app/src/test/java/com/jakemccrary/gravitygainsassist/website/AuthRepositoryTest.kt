@@ -147,7 +147,7 @@ class AuthRepositoryTest {
         var clearCount = 0
             private set
 
-        override fun clearCookies() {
+        override suspend fun clearCookies() {
             clearCount += 1
         }
     }

@@ -5,9 +5,14 @@ import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import java.net.URI
+import kotlin.coroutines.resume
 
 interface GripGainsLoginWebViewFactory {
     fun create(context: Context, onPageFinished: () -> Unit): WebView
@@ -15,39 +20,63 @@ interface GripGainsLoginWebViewFactory {
 
 class AndroidGripGainsCookieSource(
     private val cookieManager: CookieManager = CookieManager.getInstance(),
+    private val webSignInDataCleaner: GripGainsCookieCleaner =
+        GripGainsWebSignInDataCleaner(AndroidGripGainsWebSignInDataStore(cookieManager)),
 ) : GripGainsCookieSource, GripGainsCookieCleaner {
     override fun readCookieHeader(url: String): String? = cookieManager.getCookie(url)
 
-    override fun clearCookies() {
-        readCookieHeader(GripGainsUrls.baseUrl)
-            .orEmpty()
-            .split(";")
-            .mapNotNull { cookie -> cookie.cookieName() }
-            .forEach { cookieName ->
-                cookieManager.setCookie(
-                    GripGainsUrls.baseUrl,
-                    "$cookieName=; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/",
-                )
-            }
-        cookieManager.flush()
-    }
+    override suspend fun clearCookies() = webSignInDataCleaner.clearCookies()
 }
 
 interface GripGainsCookieCleaner {
-    fun clearCookies()
+    suspend fun clearCookies()
 }
 
 object NoOpGripGainsCookieCleaner : GripGainsCookieCleaner {
-    override fun clearCookies() = Unit
+    override suspend fun clearCookies() = Unit
 }
 
-private fun String.cookieName(): String? {
-    val separatorIndex = indexOf('=')
-    if (separatorIndex <= 0) {
-        return null
+internal class GripGainsWebSignInDataCleaner(
+    private val dataStore: GripGainsWebSignInDataStore,
+) : GripGainsCookieCleaner {
+    override suspend fun clearCookies() {
+        dataStore.clearCookies()
+        dataStore.flushCookies()
+        dataStore.clearStorage()
+    }
+}
+
+internal interface GripGainsWebSignInDataStore {
+    suspend fun clearCookies()
+
+    fun flushCookies()
+
+    fun clearStorage()
+}
+
+private class AndroidGripGainsWebSignInDataStore(
+    private val cookieManager: CookieManager = CookieManager.getInstance(),
+    private val webStorage: WebStorage = WebStorage.getInstance(),
+) : GripGainsWebSignInDataStore {
+    override suspend fun clearCookies() {
+        withContext(Dispatchers.Main.immediate) {
+            suspendCancellableCoroutine { continuation ->
+                cookieManager.removeAllCookies {
+                    if (continuation.isActive) {
+                        continuation.resume(Unit)
+                    }
+                }
+            }
+        }
     }
 
-    return substring(0, separatorIndex).trim().ifBlank { null }
+    override fun flushCookies() {
+        cookieManager.flush()
+    }
+
+    override fun clearStorage() {
+        webStorage.deleteAllData()
+    }
 }
 
 class AndroidGripGainsLoginWebViewFactory(

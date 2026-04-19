@@ -116,7 +116,7 @@ class AppContainer private constructor(
                 zoneId = zoneId,
                 syncFailureNotifier = syncFailureNotifier,
             )
-            val workerFactory = AppWorkerFactory(syncCoordinator, autoSyncCoordinator)
+            val workerFactory = AppWorkerFactory(syncCoordinator, syncScheduler, autoSyncCoordinator)
 
             return AppContainer(
                 healthPermissionGateway = healthPermissionGateway,
