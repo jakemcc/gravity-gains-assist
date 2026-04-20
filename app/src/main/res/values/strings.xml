@@ -7,4 +7,6 @@
     <string name="sync_success_notification_title">Gravity Gains sync complete</string>
     <string name="sync_failure_notification_channel_name">Sync failures</string>
     <string name="sync_failure_notification_channel_description">Notifications for automatic sync failures.</string>
+    <string name="sync_success_notification_channel_name">Sync successes</string>
+    <string name="sync_success_notification_channel_description">Notifications for successful automatic syncs.</string>
 </resources>
