@@ -82,13 +82,13 @@ class DefaultAutoSyncCoordinator(
 
         when (authRepository.getSessionState().status) {
             GripGainsSessionState.Status.NO_TOKEN -> {
-                appStateRepository.recordSyncSkipped(SyncSkipReason.MISSING_SESSION)
+                recordAuthRequired(SyncSkipReason.MISSING_SESSION)
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appState))
                 return
             }
 
             GripGainsSessionState.Status.INVALID_SESSION -> {
-                appStateRepository.recordSyncSkipped(SyncSkipReason.INVALID_SESSION)
+                recordAuthRequired(SyncSkipReason.INVALID_SESSION)
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appState))
                 return
             }
@@ -130,13 +130,13 @@ class DefaultAutoSyncCoordinator(
             }
 
             SubmissionResult.MissingSession -> {
-                appStateRepository.recordSyncSkipped(SyncSkipReason.MISSING_SESSION)
+                recordAuthRequired(SyncSkipReason.MISSING_SESSION)
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
             }
 
             SubmissionResult.InvalidSession,
             SubmissionResult.AuthExpired -> {
-                appStateRepository.recordSyncSkipped(SyncSkipReason.INVALID_SESSION)
+                recordAuthRequired(SyncSkipReason.INVALID_SESSION)
                 scheduleFollowUp(autoSyncPlanner.nextCheckAfterDayComplete(appStateRepository.appState.first()))
             }
 
@@ -186,6 +186,11 @@ class DefaultAutoSyncCoordinator(
         syncFailureNotifier.notifyFailure(message)
     }
 
+    private suspend fun recordAuthRequired(reason: SyncSkipReason) {
+        appStateRepository.recordSyncSkipped(reason)
+        syncFailureNotifier.notifyFailure(AUTH_REQUIRED_MESSAGE)
+    }
+
     private fun backgroundSkipReason(status: HealthConnectStatus): SyncSkipReason? {
         return when {
             status.availability != HealthConnectAvailability.AVAILABLE ->
@@ -208,6 +213,7 @@ class DefaultAutoSyncCoordinator(
             "Network error while submitting to Grip Gains. Retrying once in 2 minutes."
         const val NETWORK_RETRY_FAILED_MESSAGE =
             "Network error while submitting to Grip Gains. Use Run sync now to try again."
+        const val AUTH_REQUIRED_MESSAGE = "Grip Gains sign-in expired. Sign in again to restore syncing."
         const val SYNC_SUCCESS_MESSAGE = "Synced weight to Grip Gains."
     }
 }

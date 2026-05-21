@@ -154,6 +154,30 @@ class AutoSyncCoordinatorTest {
     }
 
     @Test
+    fun `invalid session notifies that sign in is needed and schedules tomorrow`() = runTest {
+        val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
+        val scheduler = FakeSyncScheduler()
+        val notifier = FakeSyncFailureNotifier()
+        val coordinator = DefaultAutoSyncCoordinator(
+            healthConnectRepository = FakeHealthConnectRepository(healthStatus = availableHealthStatus),
+            appStateRepository = appStateRepository,
+            authRepository = FakeAuthRepository(GripGainsSessionState.Status.INVALID_SESSION),
+            websiteSubmissionRepository = FakeWebsiteSubmissionRepository(),
+            syncScheduler = scheduler,
+            autoSyncPlanner = AutoSyncPlanner(fixedClock, zoneId),
+            clock = fixedClock,
+            zoneId = zoneId,
+            syncFailureNotifier = notifier,
+        )
+
+        coordinator.runAutoSync()
+
+        assertEquals(SyncSkipReason.INVALID_SESSION, appStateRepository.lastSkippedReason)
+        assertEquals(listOf("Grip Gains sign-in expired. Sign in again to restore syncing."), notifier.failureMessages)
+        assertEquals(listOf(Instant.parse("2026-03-28T12:00:00Z")), scheduler.followUpAutoSyncRequests)
+    }
+
+    @Test
     fun `network submission failure records the issue and schedules one retry`() = runTest {
         val appStateRepository = FakeAppStateRepository(AppState(autoSyncEnabled = true))
         val scheduler = FakeSyncScheduler()
@@ -422,8 +446,11 @@ class AutoSyncCoordinatorTest {
 
     private class FakeSyncFailureNotifier : SyncFailureNotifier {
         val successMessages = mutableListOf<String>()
+        val failureMessages = mutableListOf<String>()
 
-        override fun notifyFailure(message: String) = Unit
+        override fun notifyFailure(message: String) {
+            failureMessages += message
+        }
 
         override fun notifySuccess(message: String) {
             successMessages += message
