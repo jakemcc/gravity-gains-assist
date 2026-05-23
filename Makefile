@@ -5,6 +5,7 @@ APP_ID := com.jakemccrary.gravitygainsassist
 MAIN_ACTIVITY := $(APP_ID)/.MainActivity
 GRADLEW := ./gradlew
 ADB := adb
+VERSION_FILE := app/build.gradle.kts
 SERIAL_ARG := $(if $(SERIAL),-s $(SERIAL),)
 DEBUG_APK := app/build/outputs/apk/debug/app-debug.apk
 RELEASE_APK := app/build/outputs/apk/release/app-release.apk
@@ -27,13 +28,16 @@ DEBUG_INPUTS := \
 	$(GRADLE_INPUTS) \
 	$(call rwildcard,app/src/main/,*)
 
-.PHONY: help test bundle-release verify install install-release run clean
+.PHONY: help test bump-version bundle-release verify install install-release run clean
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*## "}; {printf "\033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 test: ## Run unit tests
 	$(GRADLEW) test
+
+bump-version: ## Bump app versionName by 0.1 and versionCode by 1
+	perl -0pi -e 's/(versionCode\s*=\s*)(\d+)/$$1 . ($$2 + 1)/e; s/(versionName\s*=\s*")(\d+)\.(\d+)(")/$$1 . ($$2 + int(($$3 + 1) \/ 10)) . "." . (($$3 + 1) % 10) . $$4/e' $(VERSION_FILE)
 
 assemble: $(DEBUG_APK) ## Build the debug APK
 
