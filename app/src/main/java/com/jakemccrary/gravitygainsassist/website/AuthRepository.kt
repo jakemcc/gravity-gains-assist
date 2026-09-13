@@ -90,7 +90,8 @@ class DefaultAuthRepository(
             return
         }
 
-        sessionStore.write(record.copy(isInvalid = true))
+        sessionStore.clear()
+        cookieCleaner.clearCookies()
         mutableSessionState.value =
             GripGainsSessionState(GripGainsSessionState.Status.INVALID_SESSION)
     }
